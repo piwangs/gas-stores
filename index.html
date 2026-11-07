@@ -80,11 +80,11 @@
       <form id="loginForm" class="space-y-3">
         <div>
           <label for="loginUser" class="block text-xs font-semibold uppercase mb-1 text-slate-600">Username</label>
-          <input id="loginUser" required autocomplete="username" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter username (e.g. admin)">
+          <input id="loginUser" required autocomplete="username" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter username">
         </div>
         <div>
           <label for="loginPass" class="block text-xs font-semibold uppercase mb-1 text-slate-600">Password</label>
-          <input id="loginPass" type="password" required autocomplete="current-password" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter password (e.g. admin2026)">
+          <input id="loginPass" type="password" required autocomplete="current-password" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter password">
         </div>
         <div id="loginError" class="hidden text-xs text-rose-600 font-semibold text-center">Invalid credentials or disabled account.</div>
         <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg text-sm shadow-md transition">Sign In</button>
@@ -171,7 +171,6 @@
         <button data-category="Fresh Food Items" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">Fresh Food</button>
       </div>
       <div class="flex items-center gap-2 w-full md:w-auto justify-end">
-        <!-- Batch Delete Button placed right next to search bar -->
         <button id="batchDeleteBtn" type="button" class="hidden bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md transition whitespace-nowrap"><i class="fa-solid fa-trash mr-1.5"></i>Delete Selected (<span id="selectedCount">0</span>)</button>
         <input id="searchInput" type="search" placeholder="Search item..." class="w-full md:w-64 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
       </div>
@@ -265,10 +264,12 @@
   </div>
 
   <script>
-    // Supabase Credentials
+    // Supabase Credentials & Client Initialisation
     const SUPABASE_URL = "https://chfpcwlpmzcyorifzpja.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZnBjd2xwbXpjeW9yaWZ6cGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwMjE5MzEsImV4cCI6MjEwOTU5NzkzMX0.73G3XXghDxrwVxbDibXemM5LB57LHUZdw4nK_Nc4lLo";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    // Safely assign Supabase instance to dbClient to prevent duplicate identifier declaration crashes
+    const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let state = {
       user: null,
@@ -307,7 +308,7 @@
     };
 
     // -------------------------------------------------------------
-    // LOGIN & AUTH
+    // LOGIN & AUTHENTICATION
     // -------------------------------------------------------------
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -316,6 +317,7 @@
       const err = document.getElementById('loginError');
       err.classList.add('hidden');
 
+      // Emergency Default Admin Fallback
       if (u.toLowerCase() === 'admin' && p === 'admin2026') {
         state.user = { username: 'admin', role: 'Manager', location: 'Juba Depot' };
         completeLogin();
@@ -323,7 +325,7 @@
       }
 
       try {
-        const { data, error } = await supabase.from('accounts').select('*').eq('username', u).single();
+        const { data, error } = await dbClient.from('accounts').select('*').eq('username', u).single();
         if (error || !data || data.password_hash !== p) {
           err.textContent = "Invalid username or password (try admin / admin2026).";
           err.classList.remove('hidden');
@@ -388,7 +390,7 @@
     }
 
     // -------------------------------------------------------------
-    // CHUNKED RPC ENGINES (FIXES TIMEOUT & DELETION SYNC)
+    // CHUNKED RPC ENGINES
     // -------------------------------------------------------------
     async function syncBulkDataChunked(items, logs, chunkSize = 50) {
       showProgress("Synchronizing Cloud Engine", "Processing data in safe batches...", "fa-cloud-arrow-up");
@@ -399,7 +401,7 @@
         const itemChunk = items.slice(i, i + chunkSize);
         const logChunk = logs.slice(i, i + chunkSize);
 
-        const { error } = await supabase.rpc('bulk_upsert_inventory', { items_json: itemChunk, logs_json: logChunk });
+        const { error } = await dbClient.rpc('bulk_upsert_inventory', { items_json: itemChunk, logs_json: logChunk });
         if (error) {
           alert(`Sync Error: ` + error.message);
           hideProgress();
@@ -423,7 +425,7 @@
 
       for (let i = 0; i < total; i += chunkSize) {
         const chunk = itemIds.slice(i, i + chunkSize);
-        const { error } = await supabase.rpc('bulk_delete_inventory', { item_ids_json: chunk });
+        const { error } = await dbClient.rpc('bulk_delete_inventory', { item_ids_json: chunk });
         if (error) {
           alert(`Delete Error: ` + error.message);
           hideProgress();
@@ -565,7 +567,7 @@
     });
 
     // -------------------------------------------------------------
-    // EXCEL UPLOAD (WITH LIVE COUNTER & AUTO ID)
+    // EXCEL UPLOAD
     // -------------------------------------------------------------
     elements.uploadExcelInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -645,8 +647,8 @@
       showProgress("Fetching Cloud Data", "Synchronizing master items & logs...", "fa-cloud-arrow-down");
       try {
         const [itemsRes, logsRes] = await Promise.all([
-          supabase.from('master_items').select('*'),
-          supabase.from('inventory_logs').select('*')
+          dbClient.from('master_items').select('*'),
+          dbClient.from('inventory_logs').select('*')
         ]);
         if (itemsRes.data) state.masterItems = itemsRes.data;
         if (logsRes.data) state.dailyLogs = logsRes.data;
@@ -664,7 +666,7 @@
     }
 
     function setupRealtimeSubscription() {
-      supabase
+      dbClient
         .channel('inventory-global-sync')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'master_items' }, payload => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
