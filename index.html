@@ -80,11 +80,11 @@
       <form id="loginForm" class="space-y-3">
         <div>
           <label for="loginUser" class="block text-xs font-semibold uppercase mb-1 text-slate-600">Username</label>
-          <input id="loginUser" required autocomplete="username" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter username">
+          <input id="loginUser" required autocomplete="username" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter username (e.g. admin)">
         </div>
         <div>
           <label for="loginPass" class="block text-xs font-semibold uppercase mb-1 text-slate-600">Password</label>
-          <input id="loginPass" type="password" required autocomplete="current-password" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter password">
+          <input id="loginPass" type="password" required autocomplete="current-password" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter password (e.g. admin2026)">
         </div>
         <div id="loginError" class="hidden text-xs text-rose-600 font-semibold text-center">Invalid credentials or disabled account.</div>
         <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg text-sm shadow-md transition">Sign In</button>
@@ -154,7 +154,7 @@
         <button id="nextDateBtn" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm font-semibold transition"><i class="fa-solid fa-chevron-right"></i></button>
         <button id="todayBtn" class="bg-brand-50 hover:bg-brand-100 text-brand-700 px-3 py-2 rounded-lg text-xs font-bold transition">Today</button>
       </div>
-      <div id="managerLocationBox" class="flex items-center gap-2">
+      <div id="managerLocationBox" class="hidden items-center gap-2">
         <label for="locationSelector" class="text-xs font-semibold text-slate-500">Active Depot Node:</label>
         <select id="locationSelector" class="bg-slate-50 border border-slate-300 rounded-lg text-xs p-2 font-semibold text-slate-800 focus:ring-brand-500"></select>
       </div>
@@ -224,68 +224,6 @@
     </div>
   </main>
 
-  <!-- Single Item Modal -->
-  <div id="itemModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
-      <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
-        <h3 id="modalTitle" class="font-bold text-sm">Add/Edit Inventory Item</h3>
-        <button id="closeItemX" type="button" class="text-slate-300 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-      <form id="itemForm" class="p-6 space-y-4">
-        <div id="modalLocationWrapper" class="bg-amber-50 border border-amber-200 p-3 rounded-lg">
-          <label class="block text-xs font-bold text-amber-900 mb-1"><i class="fa-solid fa-store mr-1 text-amber-600"></i>Store Location:</label>
-          <select id="itemTargetLocation" class="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-amber-500"></select>
-        </div>
-        <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg space-y-3">
-          <p class="text-[10px] text-blue-800 font-semibold"><i class="fa-solid fa-globe mr-1"></i>GLOBAL MASTER DATA</p>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Item ID</label>
-              <input id="itemId" required class="w-full bg-slate-100 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-600" placeholder="e.g. 001">
-            </div>
-            <div class="col-span-2">
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Description</label>
-              <input id="itemDescription" required maxlength="120" class="w-full border rounded-lg px-3 py-2 text-xs">
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Category</label>
-              <select id="itemCategory" required class="w-full border rounded-lg px-3 py-2 text-xs">
-                <option>Dry Food Items</option>
-                <option>Soft Drinks</option>
-                <option>Alcoholic</option>
-                <option>Frozen</option>
-                <option>Fresh Food Items</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Unit</label>
-              <input id="itemSpec" required maxlength="30" placeholder="Kg, Pkt, Can" class="w-full border rounded-lg px-3 py-2 text-xs">
-            </div>
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-3">
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Opening Stock</label><input id="itemOpening" type="number" min="0" step="any" required value="0" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Stock Added</label><input id="itemAdded" type="number" min="0" step="any" value="0" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Daily Issues</label><input id="itemIssues" type="number" min="0" step="any" value="0" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Unit Cost ($)</label><input id="itemCost" type="number" min="0" step="0.01" value="0.00" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Selling Price ($)</label><input id="itemPrice" type="number" min="0" step="0.01" value="0.00" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-        </div>
-        <div><label class="block text-xs font-semibold mb-1 text-slate-600">Comments</label><input id="itemComments" maxlength="300" class="w-full border rounded-lg px-3 py-2 text-xs" placeholder="Notes..."></div>
-        <div class="flex justify-between items-center pt-2">
-          <button id="deleteItemBtn" type="button" class="hidden bg-rose-100 hover:bg-rose-200 text-rose-700 px-4 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-trash mr-1"></i>Delete Item</button>
-          <div class="flex gap-2 ml-auto">
-            <button id="cancelItemBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg text-xs font-semibold">Cancel</button>
-            <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md">Save & Sync</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <script>
     // Supabase Credentials
     const SUPABASE_URL = "https://YOUR_SUPABASE_PROJECT_ID.supabase.co";
@@ -294,7 +232,7 @@
 
     // Application State
     let state = {
-      user: { username: "Admin", role: "Manager", location: "Juba Depot" },
+      user: null,
       locations: ["Juba Depot", "Tomping", "UNHOUSE", "WAU", "YAMBIO", "Bentiu Main Camp"],
       selectedLocation: "Juba Depot",
       selectedDate: new Date().toISOString().split('T')[0],
@@ -326,6 +264,87 @@
     };
 
     // -------------------------------------------------------------
+    // LOGIN AUTHENTICATION HANDLER
+    // -------------------------------------------------------------
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const usernameInput = document.getElementById('loginUser').value.trim();
+      const passwordInput = document.getElementById('loginPass').value.trim();
+      const errorDiv = document.getElementById('loginError');
+
+      errorDiv.classList.add('hidden');
+
+      // Emergency / Default Admin Fallback
+      if (usernameInput.toLowerCase() === 'admin' && passwordInput === 'admin2026') {
+        state.user = { username: 'admin', role: 'Manager', location: 'Juba Depot' };
+        completeLogin();
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('accounts')
+          .select('*')
+          .eq('username', usernameInput)
+          .single();
+
+        if (error || !data || data.password_hash !== passwordInput) {
+          errorDiv.textContent = "Invalid username or password (try admin / admin2026).";
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+
+        state.user = {
+          username: data.username,
+          role: data.role,
+          location: data.location_name
+        };
+        completeLogin();
+
+      } catch (err) {
+        console.error("Login exception:", err);
+        // Fallback for offline mode testing
+        if (usernameInput.toLowerCase() === 'admin' && passwordInput === 'admin2026') {
+          state.user = { username: 'admin', role: 'Manager', location: 'Juba Depot' };
+          completeLogin();
+          return;
+        }
+        errorDiv.textContent = "Connection error. Use admin / admin2026 for fallback login.";
+        errorDiv.classList.remove('hidden');
+      }
+    });
+
+    function completeLogin() {
+      document.getElementById('loginModal').classList.add('hidden');
+      document.getElementById('displayUserName').textContent = `${state.user.username} (${state.user.role})`;
+      document.getElementById('locationBadge').textContent = state.user.location;
+      
+      if (state.user.role === 'Manager') {
+        document.getElementById('managerLocationBox').classList.remove('hidden');
+        document.getElementById('managerLocationBox').classList.add('flex');
+        document.getElementById('newItemBtn').classList.remove('hidden');
+        document.getElementById('backupBtn').classList.remove('hidden');
+        document.getElementById('restoreLabel').classList.remove('hidden');
+        document.getElementById('resetStockBtn').classList.remove('hidden');
+        document.getElementById('manageUsersBtn').classList.remove('hidden');
+        document.getElementById('auditReportBtn').classList.remove('hidden');
+        document.getElementById('transferBtn').classList.remove('hidden');
+      }
+
+      state.selectedLocation = state.user.location;
+      if (elements.locationSelector) {
+        elements.locationSelector.value = state.selectedLocation;
+      }
+      
+      loadCloudData();
+      setupRealtimeSubscription();
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      location.reload();
+    });
+
+    // -------------------------------------------------------------
     // PROGRESS MODAL CONTROL FUNCTIONS
     // -------------------------------------------------------------
     function showProgress(title, subtitle, iconClass = "fa-sync fa-spin") {
@@ -354,7 +373,7 @@
     }
 
     // -------------------------------------------------------------
-    // CHUNKED RPC SYNCHRONIZATION ENGINE (Fixes Batch RPC Errors)
+    // CHUNKED RPC SYNCHRONIZATION ENGINE
     // -------------------------------------------------------------
     async function syncBulkDataChunked(items, logs, chunkSize = 50) {
       showProgress("Synchronizing Cloud Engine", "Processing data in small safe batches...", "fa-cloud-arrow-up");
@@ -362,7 +381,6 @@
       const totalItems = Math.max(items.length, logs.length);
       let processed = 0;
 
-      // Slice into chunks to avoid database timeouts
       for (let i = 0; i < totalItems; i += chunkSize) {
         const itemChunk = items.slice(i, i + chunkSize);
         const logChunk = logs.slice(i, i + chunkSize);
@@ -383,7 +401,6 @@
         updateProgress(processed, totalItems, `Synced ${processed} of ${totalItems} records`);
       }
 
-      // Persist to local IndexedDB
       await idbKeyval.set('gas_master_items', state.masterItems);
       await idbKeyval.set('gas_daily_logs', state.dailyLogs);
 
@@ -416,7 +433,6 @@
         updateProgress(processed, total, `Deleted ${processed} of ${total} items`);
       }
 
-      // Remove locally
       state.masterItems = state.masterItems.filter(item => !itemIds.includes(item.id));
       state.dailyLogs = state.dailyLogs.filter(log => !itemIds.includes(log.item_id));
       
@@ -476,7 +492,6 @@
             newItems.push(item);
             newLogs.push(log);
 
-            // Update local memory state
             const mIdx = state.masterItems.findIndex(m => m.id === itemId);
             if (mIdx >= 0) state.masterItems[mIdx] = item;
             else state.masterItems.push(item);
@@ -488,7 +503,6 @@
             updateProgress(i + 1, totalRows, `Parsed ${i + 1} of ${totalRows} rows`);
           }
 
-          // Trigger chunked RPC sync
           await syncBulkDataChunked(newItems, newLogs);
           renderTable();
 
@@ -502,7 +516,7 @@
     });
 
     // -------------------------------------------------------------
-    // EXCEL TEMPLATE GENERATOR & DOWNLOADER
+    // EXCEL TEMPLATE DOWNLOADER
     // -------------------------------------------------------------
     elements.downloadTemplateBtn.addEventListener('click', () => {
       showProgress("Generating Excel Template", "Formatting spreadsheet download...", "fa-download");
@@ -644,13 +658,12 @@
           <td class="p-3 text-right font-mono font-bold text-emerald-600">$${revenue.toFixed(2)}</td>
           <td class="p-3 text-slate-500 italic max-w-xs truncate">${log.comments || '--'}</td>
           <td class="p-3 text-center no-print">
-            <button onclick="editItem('${item.id}')" class="text-brand-600 hover:text-brand-800 p-1 font-bold" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+            <span class="text-slate-400 text-xs">--</span>
           </td>
         `;
         elements.tableBody.appendChild(tr);
       });
 
-      // Update KPIs
       document.getElementById('statTotalItems').textContent = filteredItems.length;
       document.getElementById('statTotalIssues').textContent = totalIssuesCount;
       document.getElementById('statDailyRevenue').textContent = `$${totalEstRevenue.toFixed(2)}`;
@@ -695,18 +708,14 @@
       setTimeout(() => elements.saveStatus.classList.add('opacity-0'), 2500);
     }
 
-    // -------------------------------------------------------------
-    // INITIALIZATION & EVENT LISTENERS
-    // -------------------------------------------------------------
-    window.addEventListener('DOMContentLoaded', async () => {
+    // Window Initialization
+    window.addEventListener('DOMContentLoaded', () => {
       elements.selectedDate.value = state.selectedDate;
-
-      // Populate locations dropdown
       elements.locationSelector.innerHTML = state.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
       elements.locationSelector.value = state.selectedLocation;
 
       elements.locationSelector.addEventListener('change', (e) => {
-        state.selectedLocation = e.value || e.target.value;
+        state.selectedLocation = e.target.value;
         renderTable();
       });
 
@@ -715,7 +724,6 @@
         renderTable();
       });
 
-      // Category filters
       document.querySelectorAll('.cat-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           document.querySelectorAll('.cat-btn').forEach(b => {
@@ -727,15 +735,10 @@
         });
       });
 
-      // Search bar
       document.getElementById('searchInput').addEventListener('input', (e) => {
         state.searchQuery = e.target.value;
         renderTable();
       });
-
-      // Load initial Cloud & Realtime sync
-      await loadCloudData();
-      setupRealtimeSubscription();
     });
   </script>
 </body>
