@@ -26,7 +26,7 @@
     @media print {
       @page { size: A4 landscape; margin: 1cm; }
       body { background: white !important; color: #0f172a !important; font-size: 10pt; font-family: sans-serif; }
-      header, #loginModal, #filtersPanel, #managerLocationBox, #itemModal, #reorderModal, #transferModal, #requestModal, #auditReportModal, #userManagerModal, #editUserModal, #progressModal, button, .no-print { 
+      header, #loginModal, #filtersPanel, #managerLocationBox, #itemModal, #reorderModal, #transferModal, #requestModal, #auditReportModal, #userManagerModal, #editUserModal, button, .no-print { 
         display: none !important; 
       }
       main { max-width: none !important; padding: 0 !important; margin: 0 !important; }
@@ -45,26 +45,6 @@
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
-
-  <!-- Live Action Progress Overlay / Modal -->
-  <div id="progressModal" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex-col items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center space-y-4">
-      <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-50 text-brand-600 mb-2">
-        <i id="progressIcon" class="fa-solid fa-sync fa-spin text-2xl"></i>
-      </div>
-      <div>
-        <h3 id="progressTitle" class="text-lg font-bold text-slate-800">Processing Action...</h3>
-        <p id="progressSubtitle" class="text-xs text-slate-500 mt-1">Please wait while the system synchronizes data.</p>
-      </div>
-      <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200">
-        <div id="progressBar" class="bg-brand-600 h-full w-0 transition-all duration-300"></div>
-      </div>
-      <div class="flex justify-between items-center text-xs font-semibold text-slate-600">
-        <span id="progressCount">0 / 0 Items</span>
-        <span id="progressPercent">0%</span>
-      </div>
-    </div>
-  </div>
 
   <!-- Login Modal -->
   <div id="loginModal" class="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4">
@@ -115,8 +95,8 @@
         <button id="manageUsersBtn" type="button" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-users-gear mr-1"></i>Depots & Users</button>
         <button id="exportBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition"><i class="fa-solid fa-file-csv text-emerald-400 mr-1"></i>CSV</button>
         <button id="printBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition"><i class="fa-solid fa-print text-amber-400 mr-1"></i>Print</button>
-        <button id="downloadTemplateBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition" title="Download Excel master template"><i class="fa-solid fa-file-excel text-emerald-400 mr-1"></i>Template</button>
-        <label id="uploadExcelLabel" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition cursor-pointer" title="Upload filled Excel template">
+        <button id="downloadTemplateBtn" type="button" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition" title="Download Excel master template"><i class="fa-solid fa-file-excel text-emerald-400 mr-1"></i>Template</button>
+        <label id="uploadExcelLabel" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition cursor-pointer" title="Upload filled Excel template">
           <i class="fa-solid fa-file-import text-blue-400 mr-1"></i>Upload Excel
           <input type="file" id="uploadExcelInput" accept=".xlsx,.xls" class="hidden">
         </label>
@@ -126,13 +106,15 @@
           <input type="file" id="restoreInput" accept=".xlsx,.xls,.json" class="hidden">
         </label>
         <button id="resetStockBtn" type="button" class="hidden bg-rose-700 hover:bg-rose-800 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-md transition" title="Zero all stock quantities for selected date"><i class="fa-solid fa-eraser mr-1"></i>Reset Stock</button>
-        <button id="newItemBtn" type="button" class="bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-plus mr-1"></i>New Item</button>
+        <button id="newItemBtn" type="button" class="hidden bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-plus mr-1"></i>New Item</button>
       </div>
     </div>
   </header>
 
   <!-- Main Content -->
   <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 space-y-6">
+    
+    <!-- Printable Header Block -->
     <div class="print-header">
       <div class="flex justify-between items-center">
         <div>
@@ -154,7 +136,7 @@
         <button id="nextDateBtn" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm font-semibold transition"><i class="fa-solid fa-chevron-right"></i></button>
         <button id="todayBtn" class="bg-brand-50 hover:bg-brand-100 text-brand-700 px-3 py-2 rounded-lg text-xs font-bold transition">Today</button>
       </div>
-      <div id="managerLocationBox" class="flex items-center gap-2">
+      <div id="managerLocationBox" class="hidden items-center gap-2">
         <label for="locationSelector" class="text-xs font-semibold text-slate-500">Active Depot Node:</label>
         <select id="locationSelector" class="bg-slate-50 border border-slate-300 rounded-lg text-xs p-2 font-semibold text-slate-800 focus:ring-brand-500"></select>
       </div>
@@ -217,6 +199,7 @@
       <div id="emptyState" class="hidden p-8 text-center text-sm text-slate-500">No inventory items found for this date/location.</div>
     </section>
 
+    <!-- Printable Signature Block -->
     <div class="print-signatures">
       <div class="signature-box">Storekeeper Signature</div>
       <div class="signature-box">Warehouse Manager Signature</div>
@@ -224,7 +207,7 @@
     </div>
   </main>
 
-  <!-- Single Item Modal -->
+  <!-- Add/Edit Inventory Item Modal -->
   <div id="itemModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
       <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
@@ -232,25 +215,28 @@
         <button id="closeItemX" type="button" class="text-slate-300 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
       <form id="itemForm" class="p-6 space-y-4">
+        
         <div id="modalLocationWrapper" class="bg-amber-50 border border-amber-200 p-3 rounded-lg">
-          <label class="block text-xs font-bold text-amber-900 mb-1"><i class="fa-solid fa-store mr-1 text-amber-600"></i>Store Location:</label>
+          <label class="block text-xs font-bold text-amber-900 mb-1"><i class="fa-solid fa-store mr-1 text-amber-600"></i>Store Location for Quantity Edits only:</label>
           <select id="itemTargetLocation" class="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-amber-500"></select>
+          <p class="text-[10px] text-amber-700 mt-1">Opening / Added / Issues are location-specific. Item ID, Description, Category and Unit are global master data.</p>
         </div>
+
         <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg space-y-3">
-          <p class="text-[10px] text-blue-800 font-semibold"><i class="fa-solid fa-globe mr-1"></i>GLOBAL MASTER DATA</p>
+          <p class="text-[10px] text-blue-800 font-semibold"><i class="fa-solid fa-globe mr-1"></i>GLOBAL MASTER DATA — changes apply to every depot and every date</p>
           <div class="grid grid-cols-3 gap-3">
             <div>
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Item ID</label>
-              <input id="itemId" required class="w-full bg-slate-100 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-600" placeholder="e.g. 001">
+              <label class="block text-xs font-semibold mb-1 text-slate-600">Item ID (Global)</label>
+              <input id="itemId" required readonly class="w-full bg-slate-100 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-600" placeholder="Auto">
             </div>
             <div class="col-span-2">
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Description</label>
+              <label class="block text-xs font-semibold mb-1 text-slate-600">Description (Global)</label>
               <input id="itemDescription" required maxlength="120" class="w-full border rounded-lg px-3 py-2 text-xs">
             </div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Category</label>
+              <label class="block text-xs font-semibold mb-1 text-slate-600">Category (Global)</label>
               <select id="itemCategory" required class="w-full border rounded-lg px-3 py-2 text-xs">
                 <option>Dry Food Items</option>
                 <option>Soft Drinks</option>
@@ -260,7 +246,7 @@
               </select>
             </div>
             <div>
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Unit</label>
+              <label class="block text-xs font-semibold mb-1 text-slate-600">Unit (Global)</label>
               <input id="itemSpec" required maxlength="30" placeholder="Kg, Pkt, Can" class="w-full border rounded-lg px-3 py-2 text-xs">
             </div>
           </div>
@@ -286,457 +272,2097 @@
     </div>
   </div>
 
-  <script>
-    // Supabase Credentials
-    const SUPABASE_URL = "https://YOUR_SUPABASE_PROJECT_ID.supabase.co";
-    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  <!-- Low Stock Modal -->
+  <div id="reorderModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h2 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-cart-flatbed text-amber-500"></i>Low Stock Report</h2>
+        <button id="closeReorderX" type="button"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="reorderItemsList" class="space-y-2 text-xs"></div>
+      <div class="flex justify-end">
+        <button id="closeReorderBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg text-xs font-semibold">Close</button>
+      </div>
+    </div>
+  </div>
 
-    // Application State
-    let state = {
-      user: { username: "Admin", role: "Manager", location: "Juba Depot" },
-      locations: ["Juba Depot", "Tomping", "UNHOUSE", "WAU", "YAMBIO", "Bentiu Main Camp"],
-      selectedLocation: "Juba Depot",
-      selectedDate: new Date().toISOString().split('T')[0],
-      selectedCategory: "All",
-      searchQuery: "",
-      masterItems: [],
-      dailyLogs: [],
-      selectedIds: new Set()
-    };
+  <!-- Inter-Depot Stock Transfer Modal -->
+  <div id="transferModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-right-left text-blue-600 mr-2"></i>Inter-Depot Stock Transfer</h3>
+        <button id="closeTransferX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="transferForm" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">From Location (Source)</label>
+          <select id="transferFromLoc" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">To Location (Destination)</label>
+          <select id="transferToLoc" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Item to Transfer</label>
+          <select id="transferItemCode" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold"></select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-slate-600">Quantity</label>
+            <input id="transferQty" type="number" min="0.01" step="any" required class="w-full border rounded-lg px-3 py-2 text-xs">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-slate-600">Transfer Date</label>
+            <input id="transferDate" type="date" required class="w-full border rounded-lg px-3 py-2 text-xs">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Memo Reference / Waybill No.</label>
+          <input id="transferMemo" required maxlength="100" placeholder="e.g. MEMO-2026-089" class="w-full border rounded-lg px-3 py-2 text-xs">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button id="cancelTransferBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg text-xs font-semibold">Cancel</button>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md">Execute Transfer</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-    // UI Elements
-    const elements = {
-      progressModal: document.getElementById('progressModal'),
-      progressTitle: document.getElementById('progressTitle'),
-      progressSubtitle: document.getElementById('progressSubtitle'),
-      progressBar: document.getElementById('progressBar'),
-      progressCount: document.getElementById('progressCount'),
-      progressPercent: document.getElementById('progressPercent'),
-      progressIcon: document.getElementById('progressIcon'),
-      selectedDate: document.getElementById('selectedDate'),
-      locationSelector: document.getElementById('locationSelector'),
-      tableBody: document.getElementById('tableBody'),
-      emptyState: document.getElementById('emptyState'),
-      batchDeleteBtn: document.getElementById('batchDeleteBtn'),
-      selectAllItems: document.getElementById('selectAllItems'),
-      uploadExcelInput: document.getElementById('uploadExcelInput'),
-      downloadTemplateBtn: document.getElementById('downloadTemplateBtn'),
-      saveStatus: document.getElementById('saveStatus')
-    };
+  <!-- Store Requests & Requisitions Modal -->
+  <div id="requestModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-clipboard-list text-emerald-600 mr-2"></i>Store Requisitions & Memo Requests</h3>
+        <button id="closeRequestX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="requestForm" class="grid sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border">
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Item</label>
+          <select id="reqItemCode" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Quantity</label>
+          <input id="reqQty" type="number" min="0.01" step="any" required value="1" class="w-full border rounded-lg px-3 py-2 text-xs">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Memo Reference / Purpose</label>
+          <input id="reqMemo" required maxlength="100" placeholder="e.g. Catering Request / Memo #41" class="w-full border rounded-lg px-3 py-2 text-xs">
+        </div>
+        <div class="flex items-end">
+          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs shadow-md">Submit Request</button>
+        </div>
+      </form>
+      <div id="requestList" class="space-y-2 text-xs"></div>
+    </div>
+  </div>
 
-    // -------------------------------------------------------------
-    // PROGRESS MODAL CONTROL FUNCTIONS
-    // -------------------------------------------------------------
-    function showProgress(title, subtitle, iconClass = "fa-sync fa-spin") {
-      elements.progressTitle.textContent = title;
-      elements.progressSubtitle.textContent = subtitle;
-      elements.progressIcon.className = `fa-solid ${iconClass} text-2xl`;
-      elements.progressBar.style.width = "0%";
-      elements.progressCount.textContent = "0 / 0 Items";
-      elements.progressPercent.textContent = "0%";
-      elements.progressModal.classList.remove('hidden');
-      elements.progressModal.classList.add('flex');
-    }
+  <!-- Weekly / Monthly Audit Report Modal -->
+  <div id="auditReportModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-chart-line text-purple-600 mr-2"></i>Management Weekly / Monthly Audit</h3>
+        <button id="closeAuditX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border">
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Start Date</label>
+          <input id="auditStart" type="date" class="w-full border rounded-lg px-3 py-2 text-xs font-semibold">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">End Date</label>
+          <input id="auditEnd" type="date" class="w-full border rounded-lg px-3 py-2 text-xs font-semibold">
+        </div>
+        <div class="flex items-end">
+          <button id="generateAuditBtn" type="button" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-lg text-xs shadow-md">Generate Audit</button>
+        </div>
+      </div>
+      <div id="auditResultContainer" class="overflow-x-auto text-xs">
+        <p class="text-slate-500 text-center py-6">Select date range and click Generate Audit.</p>
+      </div>
+    </div>
+  </div>
 
-    function updateProgress(current, total, detailText = "") {
-      const pct = Math.min(100, Math.round((current / total) * 100)) || 0;
-      elements.progressBar.style.width = `${pct}%`;
-      elements.progressCount.textContent = detailText || `${current} / ${total} Items`;
-      elements.progressPercent.textContent = `${pct}%`;
-    }
-
-    function hideProgress() {
-      setTimeout(() => {
-        elements.progressModal.classList.add('hidden');
-        elements.progressModal.classList.remove('flex');
-      }, 400);
-    }
-
-    // -------------------------------------------------------------
-    // CHUNKED RPC SYNCHRONIZATION ENGINE (Fixes Batch RPC Errors)
-    // -------------------------------------------------------------
-    async function syncBulkDataChunked(items, logs, chunkSize = 50) {
-      showProgress("Synchronizing Cloud Engine", "Processing data in small safe batches...", "fa-cloud-arrow-up");
+  <!-- Store Locations & Accounts Management Modal -->
+  <div id="userManagerModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[92vh] overflow-y-auto space-y-4">
+      <div class="flex justify-between items-center"><h2 class="font-bold text-lg text-slate-800">Manage Depots & Accounts</h2><button id="closeUsersX" type="button"><i class="fa-solid fa-xmark"></i></button></div>
       
-      const totalItems = Math.max(items.length, logs.length);
-      let processed = 0;
+      <div class="space-y-2">
+        <h3 class="font-bold text-sm text-slate-800">Depot Locations</h3>
+        <form id="locationForm" class="flex flex-col sm:flex-row gap-2">
+          <input id="newLocationName" required maxlength="80" placeholder="New location name (e.g. Bentiu Main Camp)" class="border rounded-lg p-2 flex-1 text-sm">
+          <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">Add Depot</button>
+        </form>
+        <div id="locationList" class="space-y-1.5 pt-2"></div>
+      </div>
 
-      // Slice into chunks to avoid database timeouts
-      for (let i = 0; i < totalItems; i += chunkSize) {
-        const itemChunk = items.slice(i, i + chunkSize);
-        const logChunk = logs.slice(i, i + chunkSize);
+      <hr class="my-4">
 
-        const { data, error } = await supabase.rpc('bulk_upsert_inventory', {
-          items_json: itemChunk,
-          logs_json: logChunk
+      <h3 class="font-bold text-sm text-slate-800">Create Account</h3>
+      <form id="userForm" class="grid sm:grid-cols-2 gap-3">
+        <input id="newUsername" required minlength="3" maxlength="40" autocomplete="off" placeholder="Username" class="border rounded-lg p-2 text-sm">
+        <input id="newDisplayName" required maxlength="80" placeholder="Full name" class="border rounded-lg p-2 text-sm">
+        <input id="newPassword" required minlength="8" type="password" autocomplete="new-password" placeholder="Password (8+ chars)" class="border rounded-lg p-2 text-sm">
+        <select id="newUserRole" required class="border rounded-lg p-2 text-sm font-semibold">
+          <option value="Storekeeper">Storekeeper</option>
+          <option value="Manager">Manager</option>
+        </select>
+        <select id="newUserLocation" required class="border rounded-lg p-2 text-sm sm:col-span-2"></select>
+        <button type="submit" class="sm:col-span-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-2 font-semibold text-sm shadow-md">Create Account</button>
+      </form>
+
+      <hr class="my-4">
+
+      <h3 class="font-bold text-sm text-slate-800">Existing Accounts & Privileges</h3>
+      <div id="accountList" class="space-y-2 text-sm"></div>
+      <button id="closeUsersBtn" type="button" class="w-full bg-slate-100 rounded-lg p-2 text-sm font-semibold mt-2">Close</button>
+    </div>
+  </div>
+
+  <!-- Edit User Privileges Modal -->
+  <div id="editUserModal" class="fixed inset-0 bg-slate-900/80 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-user-pen text-purple-600 mr-2"></i>Edit User Privileges</h3>
+        <button id="closeEditUserX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="editUserForm" class="space-y-3">
+        <input type="hidden" id="editUserId">
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Username</label>
+          <input id="editUsernameDisplay" disabled class="w-full bg-slate-100 border rounded-lg px-3 py-2 text-xs font-mono text-slate-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Full Name</label>
+          <input id="editUserFullName" required class="w-full border rounded-lg px-3 py-2 text-xs">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-slate-600">Role</label>
+            <select id="editUserRole" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold">
+              <option value="Storekeeper">Storekeeper</option>
+              <option value="Manager">Manager</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-slate-600">Assigned Location</label>
+            <select id="editUserLocation" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold"></select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">New Password (leave blank to keep current)</label>
+          <input id="editUserPassword" type="password" placeholder="Min 8 characters" class="w-full border rounded-lg px-3 py-2 text-xs">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button id="cancelEditUserBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg text-xs font-semibold">Cancel</button>
+          <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+"use strict";
+
+const SUPABASE_URL = "https://pxboxopyrcprdmpjucia.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4Ym94b3B5cmNwcmRtcGp1Y2lhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3MzYyNDEsImV4cCI6MjEwODMxMjI0MX0.rw8NCKG1JMPDbQyiIpjRYVSpNHaXn6R_hp_aJSocGpc";
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let activeLocation = "Juba Depot";
+let currentActiveCategory = "All";
+let saveStatusTimer = null;
+let currentItems = [];
+let allLocationsList = [];
+let isOnline = navigator.onLine;
+let isSyncing = false;
+
+const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
+const CACHE_KEY_PREFIX = "gas_inv_";
+const QUEUE_KEY = "gas_sync_queue";
+
+const $ = id => document.getElementById(id);
+const isManager = () => !!currentUser && currentUser.role === "Manager";
+
+function localDateString(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth()+1).padStart(2,"0");
+  const d = String(date.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
+}
+
+function dateKey() { return $("selectedDate").value || localDateString(); }
+
+function cacheKey(loc, date) {
+  return `${CACHE_KEY_PREFIX}${loc}__${date}`;
+}
+
+function updateConnectionBadge() {
+  const badge = $("connectionBadge");
+  if (!badge) return;
+  if (!isOnline) {
+    badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800";
+    badge.innerHTML = `<i class="fa-solid fa-wifi-slash mr-1"></i>Offline`;
+  } else if (isSyncing) {
+    badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-100 text-blue-800";
+    badge.innerHTML = `<i class="fa-solid fa-sync fa-spin mr-1"></i>Syncing…`;
+  } else {
+    badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700";
+    badge.innerHTML = `<i class="fa-solid fa-wifi mr-1"></i>Online`;
+  }
+}
+
+/** Active connectivity check against Supabase (more reliable than navigator.onLine alone) */
+async function checkConnectivity() {
+  try {
+    // Lightweight HEAD-style request with short timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+      method: "HEAD",
+      headers: { apikey: SUPABASE_ANON_KEY },
+      signal: controller.signal,
+      cache: "no-store"
+    });
+    clearTimeout(timeout);
+    const online = res.ok || res.status === 400 || res.status === 401; // any response means reachable
+    if (online !== isOnline) {
+      isOnline = online;
+      updateConnectionBadge();
+      if (online) processSyncQueue();
+    }
+    return online;
+  } catch {
+    if (isOnline) {
+      isOnline = false;
+      updateConnectionBadge();
+    }
+    return false;
+  }
+}
+
+async function getSyncQueue() {
+  try {
+    const q = await idbKeyval.get(QUEUE_KEY);
+    return Array.isArray(q) ? q : [];
+  } catch {
+    return [];
+  }
+}
+
+async function setSyncQueue(queue) {
+  await idbKeyval.set(QUEUE_KEY, queue);
+}
+
+async function enqueueMutation(mutation) {
+  const queue = await getSyncQueue();
+  queue.push({
+    ...mutation,
+    id: crypto.randomUUID(),
+    createdAt: Date.now()
+  });
+  await setSyncQueue(queue);
+  showSaveStatus("Queued offline");
+}
+
+async function cacheInventory(loc, date, items) {
+  try {
+    await idbKeyval.set(cacheKey(loc, date), {
+      items,
+      cachedAt: Date.now()
+    });
+  } catch (e) {
+    console.warn("Cache write failed", e);
+  }
+}
+
+async function loadCachedInventory(loc, date) {
+  try {
+    const cached = await idbKeyval.get(cacheKey(loc, date));
+    if (cached && Array.isArray(cached.items)) {
+      return cached.items;
+    }
+  } catch {}
+  return null;
+}
+
+async function processSyncQueue() {
+  if (!isOnline || isSyncing || !currentUser) return;
+  isSyncing = true;
+  updateConnectionBadge();
+
+  let queue = await getSyncQueue();
+  const now = Date.now();
+  // Drop expired entries older than 5 hours
+  queue = queue.filter(m => (now - m.createdAt) <= FIVE_HOURS_MS);
+  await setSyncQueue(queue);
+
+  if (queue.length === 0) {
+    isSyncing = false;
+    updateConnectionBadge();
+    return;
+  }
+
+  const remaining = [];
+  for (const mut of queue) {
+    try {
+      if (mut.type === "upsert") {
+        const { error } = await db.rpc("secure_upsert_inventory", mut.payload);
+        if (error) throw error;
+      } else if (mut.type === "delete") {
+        const { error } = await db.rpc("delete_master_item", mut.payload);
+        if (error) throw error;
+      } else if (mut.type === "transfer") {
+        const { error } = await db.rpc("transfer_stock", mut.payload);
+        if (error) throw error;
+      } else if (mut.type === "request") {
+        const { error } = await db.from("store_requests").insert([mut.payload]);
+        if (error) throw error;
+      }
+      // success – do not keep
+    } catch (err) {
+      console.error("Sync mutation failed", mut, err);
+      remaining.push(mut); // retry later
+    }
+  }
+
+  await setSyncQueue(remaining);
+  isSyncing = false;
+  updateConnectionBadge();
+
+  if (remaining.length === 0) {
+    showSaveStatus("All changes synced");
+    // Refresh current view
+    if (currentUser) loadCloudData();
+  } else {
+    showSaveStatus(`${remaining.length} change(s) pending`);
+  }
+}
+
+function setupOfflineListeners() {
+  window.addEventListener("online", () => {
+    isOnline = true;
+    updateConnectionBadge();
+    checkConnectivity().then(ok => { if (ok) processSyncQueue(); });
+  });
+  window.addEventListener("offline", () => {
+    isOnline = false;
+    updateConnectionBadge();
+  });
+
+  // Initial state + active probe
+  updateConnectionBadge();
+  checkConnectivity().then(ok => {
+    if (ok) setTimeout(() => processSyncQueue(), 1200);
+  });
+
+  // Periodic real-time check every 15 seconds
+  setInterval(() => {
+    checkConnectivity();
+  }, 15000);
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  $("selectedDate").value = localDateString();
+  bindEvents();
+  updateDayLabel();
+  setupOfflineListeners();
+});
+
+function bindEvents() {
+  $("loginForm").addEventListener("submit", handleLogin);
+  $("logoutBtn").addEventListener("click", () => location.reload());
+  $("locationSelector").addEventListener("change", (e) => {
+    activeLocation = e.target.value;
+    $("locationBadge").textContent = activeLocation;
+    loadCloudData();
+  });
+  $("exportBtn").addEventListener("click", exportCSV);
+  $("printBtn").addEventListener("click", () => {
+    $("printLocationName").textContent = activeLocation;
+    $("printDateValue").textContent = dateKey();
+    $("printUserName").textContent = currentUser ? `${currentUser.name} (${currentUser.role})` : 'System';
+    window.print();
+  });
+  $("downloadTemplateBtn").addEventListener("click", downloadMasterTemplate);
+  $("uploadExcelInput").addEventListener("change", handleExcelUpload);
+  $("backupBtn").addEventListener("click", downloadInventoryBackup);
+  $("restoreInput").addEventListener("change", handleInventoryRestore);
+  $("resetStockBtn").addEventListener("click", resetAllStock);
+  $("batchDeleteBtn").addEventListener("click", batchDeleteSelected);
+  $("selectAllItems")?.addEventListener("change", (e) => {
+    document.querySelectorAll(".item-check").forEach(cb => { cb.checked = e.target.checked; });
+  });
+  $("newItemBtn").addEventListener("click", openNewItemModal);
+  $("reorderBtn").addEventListener("click", openReorderModal);
+  $("transferBtn").addEventListener("click", openTransferModal);
+  $("requestBtn").addEventListener("click", openRequestModal);
+  $("auditReportBtn").addEventListener("click", openAuditModal);
+  $("manageUsersBtn").addEventListener("click", openUserManager);
+  $("selectedDate").addEventListener("change", loadCloudData);
+  $("prevDateBtn").addEventListener("click", () => changeDate(-1));
+  $("nextDateBtn").addEventListener("click", () => changeDate(1));
+  $("todayBtn").addEventListener("click", setToday);
+  $("searchInput").addEventListener("input", renderTable);
+  $("categoryFilter").addEventListener("click", e => {
+    const button = e.target.closest("button[data-category]");
+    if (button) filterCategory(button.dataset.category);
+  });
+  $("itemForm").addEventListener("submit", saveItem);
+  $("deleteItemBtn").addEventListener("click", deleteItem);
+  $("closeItemX").addEventListener("click", closeItemModal);
+  $("cancelItemBtn").addEventListener("click", closeItemModal);
+  $("closeReorderX").addEventListener("click", closeReorderModal);
+  $("closeReorderBtn").addEventListener("click", closeReorderModal);
+  $("itemTargetLocation").addEventListener("change", loadStockDataForModalLocation);
+
+  $("transferForm").addEventListener("submit", executeTransfer);
+  $("closeTransferX").addEventListener("click", closeTransferModal);
+  $("cancelTransferBtn").addEventListener("click", closeTransferModal);
+
+  $("requestForm").addEventListener("submit", submitRequest);
+  $("closeRequestX").addEventListener("click", closeRequestModal);
+
+  $("generateAuditBtn").addEventListener("click", generateAuditReport);
+  $("closeAuditX").addEventListener("click", closeAuditModal);
+
+  $("locationForm").addEventListener("submit", createLocation);
+  $("userForm").addEventListener("submit", createAccount);
+  $("closeUsersX").addEventListener("click", closeUserManager);
+  $("closeUsersBtn").addEventListener("click", closeUserManager);
+  $("editUserForm").addEventListener("submit", saveUserEdits);
+  $("closeEditUserX").addEventListener("click", closeEditUserModal);
+  $("cancelEditUserBtn").addEventListener("click", closeEditUserModal);
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const username = $("loginUser").value.trim();
+  const password = $("loginPass").value.trim();
+
+  const { data, error } = await db.rpc('verify_store_user', {
+    input_username: username,
+    input_password: password
+  });
+
+  if (error || !data || data.length === 0) {
+    $("loginError").classList.remove("hidden");
+    return;
+  }
+
+  currentUser = data[0];
+  $("loginModal").classList.add("hidden");
+  $("displayUserName").textContent = `${currentUser.name} (${currentUser.role})`;
+
+  await loadLocations();
+
+  if (currentUser.role === "Manager") {
+    activeLocation = "Juba Depot";
+    $("managerLocationBox").classList.remove("hidden");
+    $("managerLocationBox").classList.add("flex");
+    $("newItemBtn").classList.remove("hidden");
+    $("transferBtn").classList.remove("hidden");
+    $("auditReportBtn").classList.remove("hidden");
+    $("manageUsersBtn").classList.remove("hidden");
+    $("downloadTemplateBtn").classList.remove("hidden");
+    $("uploadExcelLabel").classList.remove("hidden");
+    $("backupBtn").classList.remove("hidden");
+    $("restoreLabel").classList.remove("hidden");
+    $("resetStockBtn").classList.remove("hidden");
+    $("batchDeleteBtn").classList.remove("hidden");
+  } else {
+    activeLocation = currentUser.location;
+    $("managerLocationBox").classList.add("hidden");
+    $("newItemBtn").classList.add("hidden");
+    $("transferBtn").classList.add("hidden");
+    $("auditReportBtn").classList.add("hidden");
+    $("manageUsersBtn").classList.add("hidden");
+    $("downloadTemplateBtn").classList.add("hidden");
+    $("uploadExcelLabel").classList.add("hidden");
+    $("backupBtn").classList.add("hidden");
+    $("restoreLabel").classList.add("hidden");
+    $("resetStockBtn").classList.add("hidden");
+    $("batchDeleteBtn").classList.add("hidden");
+  }
+
+  $("locationBadge").textContent = activeLocation;
+  loadCloudData();
+}
+
+async function loadLocations() {
+  const { data } = await db.from('locations').select('name').order('name');
+  if (data && data.length) {
+    allLocationsList = data.map(l => l.name);
+    
+    // Populate location selectors
+    ["locationSelector", "itemTargetLocation", "transferFromLoc", "transferToLoc", "newUserLocation", "editUserLocation"].forEach(id => {
+      const select = $(id);
+      if (select) {
+        select.replaceChildren();
+        allLocationsList.forEach(name => {
+          const opt = document.createElement("option");
+          opt.value = name; opt.textContent = name; select.appendChild(opt);
         });
-
-        if (error) {
-          console.error("RPC Chunk Sync Error:", error);
-          alert(`Batch Sync Error at item ${i}: ` + error.message);
-          hideProgress();
-          return false;
-        }
-
-        processed += Math.max(itemChunk.length, logChunk.length);
-        updateProgress(processed, totalItems, `Synced ${processed} of ${totalItems} records`);
-      }
-
-      // Persist to local IndexedDB
-      await idbKeyval.set('gas_master_items', state.masterItems);
-      await idbKeyval.set('gas_daily_logs', state.dailyLogs);
-
-      hideProgress();
-      showSaveStatus();
-      return true;
-    }
-
-    async function syncBulkDeleteChunked(itemIds, chunkSize = 50) {
-      showProgress("Deleting Inventory Records", "Removing selected items permanently...", "fa-trash-can");
-
-      const total = itemIds.length;
-      let processed = 0;
-
-      for (let i = 0; i < total; i += chunkSize) {
-        const chunk = itemIds.slice(i, i + chunkSize);
-
-        const { data, error } = await supabase.rpc('bulk_delete_inventory', {
-          item_ids_json: chunk
-        });
-
-        if (error) {
-          console.error("RPC Delete Chunk Error:", error);
-          alert(`Batch Delete Error: ` + error.message);
-          hideProgress();
-          return false;
-        }
-
-        processed += chunk.length;
-        updateProgress(processed, total, `Deleted ${processed} of ${total} items`);
-      }
-
-      // Remove locally
-      state.masterItems = state.masterItems.filter(item => !itemIds.includes(item.id));
-      state.dailyLogs = state.dailyLogs.filter(log => !itemIds.includes(log.item_id));
-      
-      await idbKeyval.set('gas_master_items', state.masterItems);
-      await idbKeyval.set('gas_daily_logs', state.dailyLogs);
-
-      hideProgress();
-      renderTable();
-      return true;
-    }
-
-    // -------------------------------------------------------------
-    // EXCEL TEMPLATE UPLOAD WITH LIVE PROGRESS COUNTER
-    // -------------------------------------------------------------
-    elements.uploadExcelInput.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-        try {
-          const workbook = XLSX.read(evt.target.result, { type: 'binary' });
-          const sheetName = workbook.SheetNames[0];
-          const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-
-          if (!rows.length) {
-            alert("Uploaded Excel file is empty!");
-            return;
-          }
-
-          showProgress("Parsing & Uploading Template", "Reading spreadsheet records...", "fa-file-excel");
-          
-          const newItems = [];
-          const newLogs = [];
-          const totalRows = rows.length;
-
-          for (let i = 0; i < totalRows; i++) {
-            const r = rows[i];
-            const itemId = String(r['Item ID'] || r['ID'] || (i + 1)).padStart(3, '0');
-            const desc = r['Item Description'] || r['Description'] || 'Unassigned Item';
-            const cat = r['Category'] || 'Dry Food Items';
-            const unit = r['Unit'] || 'Pkt';
-
-            const item = { id: itemId, description: desc, category: cat, unit: unit };
-            const log = {
-              item_id: itemId,
-              location_name: state.selectedLocation,
-              date: state.selectedDate,
-              opening: Number(r['Opening Stock'] || r['Opening'] || 0),
-              added: Number(r['Stock Added'] || r['Added'] || 0),
-              issues: Number(r['Daily Issues'] || r['Issues'] || 0),
-              cost_price: Number(r['Unit Cost ($)'] || r['Cost Price'] || 0),
-              sale_price: Number(r['Selling Price ($)'] || r['Sale Price'] || 0),
-              comments: String(r['Comments'] || '')
-            };
-
-            newItems.push(item);
-            newLogs.push(log);
-
-            // Update local memory state
-            const mIdx = state.masterItems.findIndex(m => m.id === itemId);
-            if (mIdx >= 0) state.masterItems[mIdx] = item;
-            else state.masterItems.push(item);
-
-            const lIdx = state.dailyLogs.findIndex(l => l.item_id === itemId && l.location_name === state.selectedLocation && l.date === state.selectedDate);
-            if (lIdx >= 0) state.dailyLogs[lIdx] = log;
-            else state.dailyLogs.push(log);
-
-            updateProgress(i + 1, totalRows, `Parsed ${i + 1} of ${totalRows} rows`);
-          }
-
-          // Trigger chunked RPC sync
-          await syncBulkDataChunked(newItems, newLogs);
-          renderTable();
-
-        } catch (err) {
-          alert("Failed to parse Excel template: " + err.message);
-          hideProgress();
-        }
-      };
-      reader.readAsBinaryString(file);
-      e.target.value = "";
-    });
-
-    // -------------------------------------------------------------
-    // EXCEL TEMPLATE GENERATOR & DOWNLOADER
-    // -------------------------------------------------------------
-    elements.downloadTemplateBtn.addEventListener('click', () => {
-      showProgress("Generating Excel Template", "Formatting spreadsheet download...", "fa-download");
-      
-      setTimeout(() => {
-        const templateData = [
-          { 'Item ID': '001', 'Item Description': 'Basmati Rice 25kg', 'Category': 'Dry Food Items', 'Unit': 'Bag', 'Opening Stock': 50, 'Stock Added': 10, 'Daily Issues': 5, 'Unit Cost ($)': 25.00, 'Selling Price ($)': 30.00, 'Comments': 'Standard Stock' },
-          { 'Item ID': '002', 'Item Description': 'Cooking Oil 5L', 'Category': 'Dry Food Items', 'Unit': 'Can', 'Opening Stock': 30, 'Stock Added': 0, 'Daily Issues': 2, 'Unit Cost ($)': 12.50, 'Selling Price ($)': 15.00, 'Comments': 'Check expiry date' }
-        ];
-
-        const ws = XLSX.utils.json_to_sheet(templateData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Inventory Master");
-        XLSX.writeFile(wb, `GAS_Inventory_Master_Template_${state.selectedLocation.replace(/\s+/g, '_')}.xlsx`);
-
-        updateProgress(100, 100, "Download Complete");
-        hideProgress();
-      }, 500);
-    });
-
-    // -------------------------------------------------------------
-    // BATCH DELETE HANDLER
-    // -------------------------------------------------------------
-    elements.batchDeleteBtn.addEventListener('click', async () => {
-      const selectedIds = Array.from(state.selectedIds);
-      if (!selectedIds.length) return;
-
-      if (confirm(`Are you sure you want to permanently delete ${selectedIds.length} item(s)?`)) {
-        const success = await syncBulkDeleteChunked(selectedIds);
-        if (success) {
-          state.selectedIds.clear();
-          elements.selectAllItems.checked = false;
-          updateBatchDeleteButton();
+        if (id === "locationSelector") select.value = activeLocation;
+        if (id === "newUserLocation" || id === "editUserLocation") {
+          const optAll = document.createElement("option");
+          optAll.value = "All Locations"; optAll.textContent = "All Locations";
+          select.appendChild(optAll);
         }
       }
     });
+  }
+}
 
-    // -------------------------------------------------------------
-    // GLOBAL REALTIME CLOUD SYNC & DATA LOADING
-    // -------------------------------------------------------------
-    async function loadCloudData() {
-      showProgress("Fetching Cloud Data", "Synchronizing master items & stock logs...", "fa-cloud-arrow-down");
+async function loadCloudData() {
+  if (!currentUser) return;
+  const date = dateKey();
+  updateDayLabel();
 
-      try {
-        const [itemsRes, logsRes] = await Promise.all([
-          supabase.from('master_items').select('*'),
-          supabase.from('inventory_logs').select('*')
-        ]);
+  // Prefer live data when online
+  if (isOnline) {
+    try {
+      let { data: dailyEntries, error } = await db.from('inventory_entries')
+        .select('*')
+        .eq('location', activeLocation)
+        .eq('entry_date', date);
 
-        if (itemsRes.data) state.masterItems = itemsRes.data;
-        if (logsRes.data) state.dailyLogs = logsRes.data;
+      if (error) throw error;
 
-        await idbKeyval.set('gas_master_items', state.masterItems);
-        await idbKeyval.set('gas_daily_logs', state.dailyLogs);
+      if (!dailyEntries || dailyEntries.length === 0) {
+        const prevDate = new Date(date + "T12:00:00");
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDateStr = localDateString(prevDate);
 
-        renderTable();
-      } catch (err) {
-        console.warn("Cloud offline, loading local IndexedDB fallback...", err);
-        state.masterItems = (await idbKeyval.get('gas_master_items')) || [];
-        state.dailyLogs = (await idbKeyval.get('gas_daily_logs')) || [];
-        renderTable();
-      } finally {
-        hideProgress();
-      }
-    }
+        let { data: prevData } = await db.from('inventory_entries')
+          .select('*')
+          .eq('location', activeLocation)
+          .eq('entry_date', prevDateStr);
 
-    function setupRealtimeSubscription() {
-      supabase
-        .channel('inventory-global-sync')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'master_items' }, payload => {
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const idx = state.masterItems.findIndex(m => m.id === payload.new.id);
-            if (idx >= 0) state.masterItems[idx] = payload.new;
-            else state.masterItems.push(payload.new);
-          } else if (payload.eventType === 'DELETE') {
-            state.masterItems = state.masterItems.filter(m => m.id !== payload.old.id);
+        if (prevData && prevData.length > 0) {
+          // Carry forward closing stock via secure RPC (respects RLS)
+          for (const p of prevData) {
+            const opening = Number(p.opening) + Number(p.added) - Number(p.issues);
+            await db.rpc('secure_upsert_inventory', {
+              p_username: currentUser.username,
+              p_location: activeLocation,
+              p_entry_date: date,
+              p_item_code: p.item_code,
+              p_description: p.description,
+              p_category: p.category,
+              p_unit: p.unit,
+              p_opening: opening,
+              p_added: 0,
+              p_issues: 0,
+              p_cost: p.cost,
+              p_price: p.price,
+              p_comments: ""
+            });
           }
-          renderTable();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_logs' }, payload => {
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const idx = state.dailyLogs.findIndex(l => l.item_id === payload.new.item_id && l.location_name === payload.new.location_name && l.date === payload.new.date);
-            if (idx >= 0) state.dailyLogs[idx] = payload.new;
-            else state.dailyLogs.push(payload.new);
-          }
-          renderTable();
-        })
-        .subscribe();
-    }
+        }
+        // No default/sample items are ever inserted automatically.
 
-    // -------------------------------------------------------------
-    // RENDERING INVENTORY TABLE & UI UPDATES
-    // -------------------------------------------------------------
-    function renderTable() {
-      elements.tableBody.innerHTML = '';
-
-      const filteredItems = state.masterItems.filter(item => {
-        const matchesCategory = state.selectedCategory === 'All' || item.category === state.selectedCategory;
-        const matchesSearch = item.description.toLowerCase().includes(state.searchQuery.toLowerCase()) || item.id.toLowerCase().includes(state.searchQuery.toLowerCase());
-        return matchesCategory && matchesSearch;
-      });
-
-      if (!filteredItems.length) {
-        elements.emptyState.classList.remove('hidden');
-        return;
+        const { data: refetched } = await db.from('inventory_entries')
+          .select('*')
+          .eq('location', activeLocation)
+          .eq('entry_date', date);
+        dailyEntries = refetched || [];
       }
-      elements.emptyState.classList.add('hidden');
 
-      let totalIssuesCount = 0;
-      let totalEstRevenue = 0;
-      let lowStockAlerts = 0;
+      currentItems = dailyEntries.map(entry => ({
+        id: entry.id,
+        item_code: entry.item_code,
+        description: entry.description,
+        category: entry.category,
+        unit: entry.unit,
+        opening: Number(entry.opening) || 0,
+        added: Number(entry.added) || 0,
+        issues: Number(entry.issues) || 0,
+        cost: Number(entry.cost) || 0,
+        price: Number(entry.price) || 0,
+        comments: entry.comments || ""
+      })).sort((a, b) => a.item_code.localeCompare(b.item_code));
 
-      filteredItems.forEach(item => {
-        const log = state.dailyLogs.find(l => l.item_id === item.id && l.location_name === state.selectedLocation && l.date === state.selectedDate) || {
-          opening: 0, added: 0, issues: 0, cost_price: 0, sale_price: 0, comments: ''
-        };
-
-        const closing = Number(log.opening) + Number(log.added) - Number(log.issues);
-        const revenue = Number(log.issues) * Number(log.sale_price);
-
-        totalIssuesCount += Number(log.issues);
-        totalEstRevenue += revenue;
-        if (closing <= 5) lowStockAlerts++;
-
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 transition border-b border-slate-200";
-        tr.innerHTML = `
-          <td class="p-3 text-center"><input type="checkbox" data-id="${item.id}" class="item-checkbox rounded" ${state.selectedIds.has(item.id) ? 'checked' : ''}></td>
-          <td class="p-3 font-mono font-bold text-slate-600">${item.id}</td>
-          <td class="p-3 font-semibold text-slate-800">${item.description}</td>
-          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">${item.category}</span></td>
-          <td class="p-3 text-center text-slate-500">${item.unit}</td>
-          <td class="p-3 text-center font-semibold text-slate-700">${log.opening}</td>
-          <td class="p-3 text-center font-semibold text-emerald-600">+${log.added}</td>
-          <td class="p-3 text-center font-semibold text-amber-600">-${log.issues}</td>
-          <td class="p-3 text-center font-bold ${closing <= 5 ? 'text-rose-600 bg-rose-50 rounded' : 'text-slate-900'}">${closing}</td>
-          <td class="p-3 text-right font-mono text-slate-600">$${Number(log.cost_price).toFixed(2)}</td>
-          <td class="p-3 text-right font-mono text-slate-600">$${Number(log.sale_price).toFixed(2)}</td>
-          <td class="p-3 text-right font-mono font-bold text-emerald-600">$${revenue.toFixed(2)}</td>
-          <td class="p-3 text-slate-500 italic max-w-xs truncate">${log.comments || '--'}</td>
-          <td class="p-3 text-center no-print">
-            <button onclick="editItem('${item.id}')" class="text-brand-600 hover:text-brand-800 p-1 font-bold" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
-          </td>
-        `;
-        elements.tableBody.appendChild(tr);
-      });
-
-      // Update KPIs
-      document.getElementById('statTotalItems').textContent = filteredItems.length;
-      document.getElementById('statTotalIssues').textContent = totalIssuesCount;
-      document.getElementById('statDailyRevenue').textContent = `$${totalEstRevenue.toFixed(2)}`;
-      document.getElementById('statLowStock').textContent = lowStockAlerts;
-
-      attachCheckboxEvents();
-    }
-
-    function attachCheckboxEvents() {
-      document.querySelectorAll('.item-checkbox').forEach(cb => {
-        cb.addEventListener('change', (e) => {
-          const id = e.target.dataset.id;
-          if (e.target.checked) state.selectedIds.add(id);
-          else state.selectedIds.delete(id);
-          updateBatchDeleteButton();
-        });
-      });
-    }
-
-    elements.selectAllItems.addEventListener('change', (e) => {
-      const isChecked = e.target.checked;
-      document.querySelectorAll('.item-checkbox').forEach(cb => {
-        cb.checked = isChecked;
-        const id = cb.dataset.id;
-        if (isChecked) state.selectedIds.add(id);
-        else state.selectedIds.delete(id);
-      });
-      updateBatchDeleteButton();
-    });
-
-    function updateBatchDeleteButton() {
-      if (state.selectedIds.size > 0) {
-        elements.batchDeleteBtn.classList.remove('hidden');
-        elements.batchDeleteBtn.innerHTML = `<i class="fa-solid fa-trash mr-1"></i>Delete Selected (${state.selectedIds.size})`;
+      // Cache for offline use
+      await cacheInventory(activeLocation, date, currentItems);
+    } catch (err) {
+      console.warn("Online load failed, falling back to cache", err);
+      isOnline = false;
+      updateConnectionBadge();
+      const cached = await loadCachedInventory(activeLocation, date);
+      if (cached) {
+        currentItems = cached;
       } else {
-        elements.batchDeleteBtn.classList.add('hidden');
+        currentItems = [];
+      }
+    }
+  } else {
+    // Pure offline path
+    const cached = await loadCachedInventory(activeLocation, date);
+    if (cached) {
+      currentItems = cached;
+      showSaveStatus("Loaded from offline cache");
+    } else {
+      currentItems = [];
+      showSaveStatus("No offline data for this date");
+    }
+  }
+
+  renderTable();
+  updateKPIs();
+}
+
+function renderTable() {
+  const tbody = $("tableBody");
+  tbody.replaceChildren();
+
+  const search = $("searchInput").value.toLowerCase();
+  const filtered = currentItems.filter(item => {
+    const matchesCat = currentActiveCategory === "All" || item.category === currentActiveCategory;
+    const matchesSearch = item.description.toLowerCase().includes(search) || item.item_code.toLowerCase().includes(search);
+    return matchesCat && matchesSearch;
+  });
+
+  if (!filtered.length) {
+    $("emptyState").classList.remove("hidden");
+    return;
+  }
+  $("emptyState").classList.add("hidden");
+
+  filtered.forEach(item => {
+    const closing = Number(item.opening) + Number(item.added) - Number(item.issues);
+    const rev = Number(item.issues) * Number(item.price);
+
+    const tr = document.createElement("tr");
+    tr.className = "hover:bg-slate-50";
+    tr.innerHTML = `
+      <td class="p-3 text-center">${isManager() ? `<input type="checkbox" class="item-check rounded" data-code="${item.item_code}">` : ''}</td>
+      <td class="p-3 font-mono font-semibold text-slate-500">${item.item_code}</td>
+      <td class="p-3 font-bold text-slate-800">${item.description}</td>
+      <td class="p-3">${item.category}</td>
+      <td class="p-3 text-center">${item.unit}</td>
+      <td class="p-3 text-center font-semibold">${item.opening}</td>
+      <td class="p-3 text-center text-emerald-600">+${item.added}</td>
+      <td class="p-3 text-center text-amber-600">-${item.issues}</td>
+      <td class="p-3 text-center font-extrabold ${closing <= 5 ? 'text-rose-600' : ''}">${closing}</td>
+      <td class="p-3 text-right font-mono">$${Number(item.cost).toFixed(2)}</td>
+      <td class="p-3 text-right font-mono">$${Number(item.price).toFixed(2)}</td>
+      <td class="p-3 text-right font-mono text-emerald-600">$${rev.toFixed(2)}</td>
+      <td class="p-3 text-slate-500">${item.comments || '--'}</td>
+      <td class="p-3 text-center">
+        <button onclick="openEditItemModal(${item.id})" class="bg-amber-100 hover:bg-amber-200 text-amber-800 px-2.5 py-1 rounded text-[10px] font-bold"><i class="fa-solid fa-pen mr-1"></i>${isManager() ? 'Edit' : 'Log Stock'}</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Reset select-all checkbox
+  const selAll = $("selectAllItems");
+  if (selAll) selAll.checked = false;
+}
+
+function updateKPIs() {
+  let totalIssues = 0, totalRevenue = 0, lowStock = 0;
+  currentItems.forEach(item => {
+    const issues = Number(item.issues) || 0;
+    const closing = Number(item.opening) + Number(item.added) - issues;
+    const rev = issues * Number(item.price);
+
+    totalIssues += issues;
+    totalRevenue += rev;
+    if (closing <= 5) lowStock++;
+  });
+
+  $("statTotalItems").textContent = currentItems.length;
+  $("statTotalIssues").textContent = totalIssues;
+  $("statDailyRevenue").textContent = `$${totalRevenue.toFixed(2)}`;
+  $("statLowStock").textContent = lowStock;
+}
+
+function openEditItemModal(id) {
+  const item = currentItems.find(i => i.id === id);
+  if (!item) return;
+
+  const manager = isManager();
+  $("modalTitle").textContent = manager ? `Edit Item: ${item.description}` : `Log Stock for: ${item.description}`;
+  $("itemId").value = item.item_code;
+  $("itemId").readOnly = true;
+  $("itemDescription").value = item.description;
+  $("itemCategory").value = item.category;
+  $("itemSpec").value = item.unit;
+  $("itemCost").value = item.cost;
+  $("itemPrice").value = item.price;
+
+  if (manager) {
+    $("modalLocationWrapper").classList.remove("hidden");
+    $("itemTargetLocation").value = activeLocation;
+    $("deleteItemBtn").classList.remove("hidden");
+  } else {
+    $("modalLocationWrapper").classList.add("hidden");
+    $("itemTargetLocation").value = activeLocation;
+    $("deleteItemBtn").classList.add("hidden");
+  }
+
+  $("itemDescription").disabled = !manager;
+  $("itemCategory").disabled = !manager;
+  $("itemSpec").disabled = !manager;
+  $("itemOpening").disabled = !manager; 
+  $("itemCost").disabled = !manager;
+  $("itemPrice").disabled = !manager;
+
+  loadStockDataForModalLocation();
+
+  $("itemModal").classList.remove("hidden");
+  $("itemModal").classList.add("flex");
+}
+
+async function loadStockDataForModalLocation() {
+  const itemCode = $("itemId").value;
+  const targetLocation = isManager() ? $("itemTargetLocation").value : activeLocation;
+  const date = dateKey();
+
+  const { data } = await db.from('inventory_entries')
+    .select('*')
+    .eq('location', targetLocation)
+    .eq('entry_date', date)
+    .eq('item_code', itemCode)
+    .maybeSingle();
+
+  if (data) {
+    $("itemOpening").value = data.opening || 0;
+    $("itemAdded").value = data.added || 0;
+    $("itemIssues").value = data.issues || 0;
+    $("itemComments").value = data.comments || "";
+  } else {
+    $("itemOpening").value = 0;
+    $("itemAdded").value = 0;
+    $("itemIssues").value = 0;
+    $("itemComments").value = "";
+  }
+}
+
+async function openNewItemModal() {
+  if (!isManager()) return;
+  
+  // Fetch next automatic item code
+  const { data, error } = await db.rpc('get_next_item_code');
+  const nextCode = (!error && data) ? data : "001";
+
+  $("modalTitle").textContent = "Add New Master Item (appears in ALL depots)";
+  $("itemId").value = nextCode;
+  $("itemId").readOnly = true;
+  $("itemDescription").value = "";
+  $("itemCategory").value = "Dry Food Items";
+  $("itemSpec").value = "Kg";
+  $("itemOpening").value = "0";
+  $("itemAdded").value = "0";
+  $("itemIssues").value = "0";
+  $("itemCost").value = "0.00";
+  $("itemPrice").value = "0.00";
+  $("itemComments").value = "";
+
+  $("modalLocationWrapper").classList.remove("hidden");
+  $("itemTargetLocation").value = activeLocation;
+  $("deleteItemBtn").classList.add("hidden");
+
+  $("itemDescription").disabled = false;
+  $("itemCategory").disabled = false;
+  $("itemSpec").disabled = false;
+  $("itemOpening").disabled = false;
+  $("itemCost").disabled = false;
+  $("itemPrice").disabled = false;
+
+  $("itemModal").classList.add("flex");
+  $("itemModal").classList.remove("hidden");
+}
+
+function closeItemModal() {
+  $("itemModal").classList.add("hidden");
+  $("itemModal").classList.remove("flex");
+}
+
+async function saveItem(e) {
+  e.preventDefault();
+  const targetLocation = isManager() ? $("itemTargetLocation").value : activeLocation;
+  const itemCode = $("itemId").value.trim();
+  const isNewItem = !currentItems.some(i => i.item_code === itemCode);
+
+  // Global master fields – these must be identical in every depot
+  const globalFields = {
+    p_item_code: itemCode,
+    p_description: $("itemDescription").value.trim(),
+    p_category: $("itemCategory").value,
+    p_unit: $("itemSpec").value.trim()
+  };
+
+  const basePayload = {
+    p_username: currentUser.username,
+    p_entry_date: dateKey(),
+    ...globalFields,
+    p_cost: Number($("itemCost").value) || 0,
+    p_price: Number($("itemPrice").value) || 0,
+    p_comments: $("itemComments").value.trim()
+  };
+
+  // Quantities are location-specific
+  const opening = Number($("itemOpening").value) || 0;
+  const added   = Number($("itemAdded").value) || 0;
+  const issues  = Number($("itemIssues").value) || 0;
+
+  if (!isOnline) {
+    // Offline: only update the currently active location + queue the mutation
+    const existingIdx = currentItems.findIndex(i => i.item_code === itemCode);
+    const localItem = {
+      id: existingIdx >= 0 ? currentItems[existingIdx].id : Date.now(),
+      item_code: itemCode,
+      description: globalFields.p_description,
+      category: globalFields.p_category,
+      unit: globalFields.p_unit,
+      opening, added, issues,
+      cost: basePayload.p_cost,
+      price: basePayload.p_price,
+      comments: basePayload.p_comments
+    };
+    if (existingIdx >= 0) currentItems[existingIdx] = localItem;
+    else currentItems.push(localItem);
+    currentItems.sort((a, b) => a.item_code.localeCompare(b.item_code));
+    await cacheInventory(activeLocation, dateKey(), currentItems);
+
+    // Queue a single upsert for the target location; backend will still cascade metadata
+    await enqueueMutation({
+      type: "upsert",
+      payload: {
+        ...basePayload,
+        p_location: targetLocation,
+        p_opening: opening,
+        p_added: added,
+        p_issues: issues
+      }
+    });
+
+    closeItemModal();
+    renderTable();
+    updateKPIs();
+    showSaveStatus(isNewItem ? "New item queued (will appear in all depots after sync)" : "Queued offline");
+    return;
+  }
+
+  // ---------- ONLINE PATH ----------
+  try {
+    // Ensure locations list is loaded
+    if (!allLocationsList.length) await loadLocations();
+
+    if (isNewItem && isManager()) {
+      // Atomic server-side create in EVERY depot (one transaction)
+      const { error } = await db.rpc('create_item_all_locations', {
+        p_username: currentUser.username,
+        p_entry_date: dateKey(),
+        p_item_code: itemCode,
+        p_description: globalFields.p_description,
+        p_category: globalFields.p_category,
+        p_unit: globalFields.p_unit,
+        p_primary_location: targetLocation,
+        p_opening: opening,
+        p_added: added,
+        p_issues: issues,
+        p_cost: basePayload.p_cost,
+        p_price: basePayload.p_price,
+        p_comments: basePayload.p_comments
+      });
+      if (error) throw error;
+      showSaveStatus("New item created in ALL depots");
+    } else {
+      // Existing item or Storekeeper edit
+      const { error } = await db.rpc('secure_upsert_inventory', {
+        ...basePayload,
+        p_location: targetLocation,
+        p_opening: opening,
+        p_added: added,
+        p_issues: issues
+      });
+      if (error) throw error;
+      showSaveStatus(isManager() ? "Global catalog synced" : "Synced");
+    }
+
+    closeItemModal();
+    loadCloudData();
+  } catch (err) {
+    const msg = (err && err.message) ? err.message : String(err);
+    console.error("Save error:", err);
+
+    // Network / "Failed to fetch" → treat as offline and queue
+    if (/failed to fetch|networkerror|load failed|abort/i.test(msg) || !navigator.onLine) {
+      isOnline = false;
+      updateConnectionBadge();
+
+      // Optimistic local update + queue
+      const existingIdx = currentItems.findIndex(i => i.item_code === itemCode);
+      const localItem = {
+        id: existingIdx >= 0 ? currentItems[existingIdx].id : Date.now(),
+        item_code: itemCode,
+        description: globalFields.p_description,
+        category: globalFields.p_category,
+        unit: globalFields.p_unit,
+        opening, added, issues,
+        cost: basePayload.p_cost,
+        price: basePayload.p_price,
+        comments: basePayload.p_comments
+      };
+      if (existingIdx >= 0) currentItems[existingIdx] = localItem;
+      else currentItems.push(localItem);
+      currentItems.sort((a, b) => a.item_code.localeCompare(b.item_code));
+      await cacheInventory(activeLocation, dateKey(), currentItems);
+
+      await enqueueMutation({
+        type: "upsert",
+        payload: {
+          ...basePayload,
+          p_location: targetLocation,
+          p_opening: opening,
+          p_added: added,
+          p_issues: issues
+        }
+      });
+
+      closeItemModal();
+      renderTable();
+      updateKPIs();
+      showSaveStatus("Saved offline – will sync when connection returns");
+      return;
+    }
+
+    alert("Error saving: " + msg +
+      "\n\nCommon causes:\n• Missing or incorrect Supabase RPC functions\n• Network / CORS issue\n• RLS policies blocking the request");
+  }
+}
+
+async function deleteItem() {
+  if (!isManager()) return;
+  const itemCode = ($("itemId").value || "").trim();
+  if (!itemCode) {
+    alert("No item code found.");
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to permanently delete item #${itemCode} from ALL depots and ALL dates?\n\nThis cannot be undone.`)) {
+    return;
+  }
+
+  const payload = {
+    p_username: currentUser.username,
+    p_item_code: itemCode
+  };
+
+  // Offline path
+  if (!isOnline) {
+    currentItems = currentItems.filter(i => i.item_code !== itemCode);
+    await cacheInventory(activeLocation, dateKey(), currentItems);
+    await enqueueMutation({ type: "delete", payload });
+    closeItemModal();
+    renderTable();
+    updateKPIs();
+    showSaveStatus("Delete queued offline");
+    return;
+  }
+
+  // Online path – try the dedicated RPC first, then fall back to direct delete
+  try {
+    let deleted = false;
+
+    // 1. Preferred: use the secure RPC
+    const { error: rpcError } = await db.rpc("delete_master_item", payload);
+    if (!rpcError) {
+      deleted = true;
+    } else {
+      console.warn("delete_master_item RPC failed, falling back to direct delete:", rpcError.message);
+
+      // 2. Fallback: direct DELETE (works even if the RPC is missing)
+      const { error: delError, count } = await db
+        .from("inventory_entries")
+        .delete({ count: "exact" })
+        .eq("item_code", itemCode);
+
+      if (delError) {
+        throw new Error(delError.message);
+      }
+      deleted = true;
+      console.log(`Directly deleted ${count ?? "?"} row(s) for item_code ${itemCode}`);
+    }
+
+    if (deleted) {
+      // Clear local cache for the current view
+      currentItems = currentItems.filter(i => i.item_code !== itemCode);
+      await cacheInventory(activeLocation, dateKey(), currentItems);
+
+      closeItemModal();
+      showSaveStatus(`Item #${itemCode} deleted globally`);
+      loadCloudData();
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error deleting item: " + (err.message || err) +
+      "\n\nIf this keeps happening, open the browser console (F12) and send the error message.");
+  }
+}
+
+function showSaveStatus(msg = "Synced") {
+  const status = $("saveStatus");
+  if (!status) return;
+  status.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-1"></i>${msg}`;
+  status.classList.remove("opacity-0");
+  clearTimeout(saveStatusTimer);
+  saveStatusTimer = setTimeout(() => status.classList.add("opacity-0"), 2500);
+}
+
+function filterCategory(cat) {
+  currentActiveCategory = cat;
+  document.querySelectorAll(".cat-btn").forEach(btn => {
+    if (btn.dataset.category === cat) {
+      btn.className = "cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white";
+    } else {
+      btn.className = "cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700";
+    }
+  });
+  renderTable();
+}
+
+function setToday() { $("selectedDate").value = localDateString(); loadCloudData(); }
+
+function changeDate(days) {
+  const date = new Date(dateKey() + "T12:00:00");
+  date.setDate(date.getDate() + days);
+  $("selectedDate").value = localDateString(date);
+  loadCloudData();
+}
+
+function updateDayLabel() {
+  const value = dateKey();
+  if (!value) { $("dayLabel").textContent = "--"; return; }
+  const date = new Date(value + "T12:00:00");
+  $("dayLabel").textContent = date.toLocaleDateString("en-US", { weekday:"long", year:"numeric", month:"short", day:"numeric" });
+}
+
+async function openReorderModal() {
+  const { data } = await db.rpc('get_low_stock_report', {
+    p_location: activeLocation,
+    p_threshold: 5
+  });
+
+  const container = $("reorderItemsList");
+  container.replaceChildren();
+
+  if (data && data.length > 0) {
+    data.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "flex justify-between bg-slate-50 p-2 rounded border";
+      div.innerHTML = `<span><b>${item.description}</b> (${item.item_code})</span> <span class="text-rose-600 font-bold">Stock: ${item.closing_stock} ${item.unit}</span>`;
+      container.appendChild(div);
+    });
+  } else {
+    container.innerHTML = `<div class="text-slate-500 text-center py-2">No items are currently at or below reorder threshold (<= 5 units).</div>`;
+  }
+
+  $("reorderModal").classList.remove("hidden");
+  $("reorderModal").classList.add("flex");
+}
+
+function closeReorderModal() {
+  $("reorderModal").classList.add("hidden");
+  $("reorderModal").classList.remove("flex");
+}
+
+// Inter-Depot Transfers
+async function openTransferModal() {
+  if (!isManager()) return;
+  $("transferDate").value = dateKey();
+  $("transferQty").value = "";
+  $("transferMemo").value = "";
+
+  const itemSelect = $("transferItemCode");
+  itemSelect.replaceChildren();
+  currentItems.forEach(i => {
+    const opt = document.createElement("option");
+    opt.value = i.item_code;
+    opt.textContent = `${i.item_code} - ${i.description} (${i.unit})`;
+    itemSelect.appendChild(opt);
+  });
+
+  $("transferModal").classList.remove("hidden");
+  $("transferModal").classList.add("flex");
+}
+
+function closeTransferModal() {
+  $("transferModal").classList.add("hidden");
+  $("transferModal").classList.remove("flex");
+}
+
+async function executeTransfer(e) {
+  e.preventDefault();
+  if (!isManager()) return;
+
+  const payload = {
+    p_username: currentUser.username,
+    p_from_location: $("transferFromLoc").value,
+    p_to_location: $("transferToLoc").value,
+    p_item_code: $("transferItemCode").value,
+    p_quantity: Number($("transferQty").value),
+    p_transfer_date: $("transferDate").value,
+    p_memo: $("transferMemo").value.trim()
+  };
+
+  if (!isOnline) {
+    await enqueueMutation({ type: "transfer", payload });
+    alert("Transfer queued offline. It will execute automatically when connectivity is restored (within 5 hours).");
+    closeTransferModal();
+    return;
+  }
+
+  const { error } = await db.rpc('transfer_stock', payload);
+  if (error) {
+    alert("Transfer Error: " + error.message);
+    return;
+  }
+
+  alert("Inter-depot stock transfer executed successfully!");
+  closeTransferModal();
+  loadCloudData();
+}
+
+// Store Requisitions
+async function openRequestModal() {
+  $("reqQty").value = "1";
+  $("reqMemo").value = "";
+  
+  const itemSelect = $("reqItemCode");
+  itemSelect.replaceChildren();
+  currentItems.forEach(i => {
+    const opt = document.createElement("option");
+    opt.value = i.item_code;
+    opt.textContent = `${i.item_code} - ${i.description} (${i.unit})`;
+    itemSelect.appendChild(opt);
+  });
+
+  await loadRequestsList();
+  $("requestModal").classList.remove("hidden");
+  $("requestModal").classList.add("flex");
+}
+
+function closeRequestModal() {
+  $("requestModal").classList.add("hidden");
+  $("requestModal").classList.remove("flex");
+}
+
+async function submitRequest(e) {
+  e.preventDefault();
+  const payload = {
+    request_date: dateKey(),
+    location: activeLocation,
+    item_code: $("reqItemCode").value,
+    quantity_requested: Number($("reqQty").value),
+    memo_reference: $("reqMemo").value.trim(),
+    status: 'Pending',
+    created_by: currentUser.username
+  };
+
+  if (!isOnline) {
+    await enqueueMutation({ type: "request", payload });
+    $("reqMemo").value = "";
+    showSaveStatus("Request queued offline");
+    // Optionally show a local pending entry in the list
+    const container = $("requestList");
+    const div = document.createElement("div");
+    div.className = "flex justify-between items-center bg-amber-50 p-2 rounded border border-amber-200";
+    div.innerHTML = `
+      <div><b>${payload.item_code}</b> (Qty: ${payload.quantity_requested})<br>
+      <span class="text-[10px] text-slate-500">Memo: ${payload.memo_reference} | Queued offline</span></div>
+      <span class="px-2 py-0.5 rounded font-bold text-[10px] bg-amber-100 text-amber-800">Queued</span>
+    `;
+    container.prepend(div);
+    return;
+  }
+
+  const { error } = await db.from('store_requests').insert([payload]);
+  if (error) {
+    alert("Error submitting request: " + error.message);
+    return;
+  }
+
+  $("reqMemo").value = "";
+  await loadRequestsList();
+}
+
+async function loadRequestsList() {
+  let data = [];
+  if (isOnline) {
+    try {
+      const res = await db.from('store_requests')
+        .select('*')
+        .eq('location', activeLocation)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      data = res.data || [];
+    } catch {
+      data = [];
+    }
+  }
+
+  const container = $("requestList");
+  container.replaceChildren();
+
+  if (data && data.length > 0) {
+    data.forEach(r => {
+      const item = currentItems.find(i => i.item_code === r.item_code);
+      const div = document.createElement("div");
+      div.className = "flex justify-between items-center bg-slate-50 p-2 rounded border";
+      div.innerHTML = `
+        <div><b>${item ? item.description : r.item_code}</b> (Qty: ${r.quantity_requested})<br><span class="text-[10px] text-slate-500">Memo: ${r.memo_reference} | By: ${r.created_by}</span></div>
+        <span class="px-2 py-0.5 rounded font-bold text-[10px] ${r.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">${r.status}</span>
+      `;
+      container.appendChild(div);
+    });
+  } else {
+    container.innerHTML = `<div class="text-slate-500 text-center py-2">No active requisitions for this location.</div>`;
+  }
+}
+
+// Weekly / Monthly Audit Report
+function openAuditModal() {
+  if (!isManager()) return;
+  $("auditStart").value = localDateString();
+  $("auditEnd").value = localDateString();
+  $("auditResultContainer").innerHTML = `<p class="text-slate-500 text-center py-6">Select date range and click Generate Audit.</p>`;
+  $("auditReportModal").classList.remove("hidden");
+  $("auditReportModal").classList.add("flex");
+}
+
+function closeAuditModal() {
+  $("auditReportModal").classList.add("hidden");
+  $("auditReportModal").classList.remove("flex");
+}
+
+async function generateAuditReport() {
+  const start = $("auditStart").value;
+  const end = $("auditEnd").value;
+  if (!start || !end) { alert("Please select both start and end dates."); return; }
+
+  const { data, error } = await db.from('inventory_entries')
+    .select('*')
+    .eq('location', activeLocation)
+    .gte('entry_date', start)
+    .lte('entry_date', end);
+
+  if (error || !data) {
+    alert("Error fetching audit data.");
+    return;
+  }
+
+  // Aggregate by item
+  const aggregated = {};
+  data.forEach(row => {
+    if (!aggregated[row.item_code]) {
+      aggregated[row.item_code] = {
+        item_code: row.item_code,
+        description: row.description,
+        category: row.category,
+        unit: row.unit,
+        total_added: 0,
+        total_issues: 0,
+        total_revenue: 0
+      };
+    }
+    aggregated[row.item_code].total_added += Number(row.added) || 0;
+    aggregated[row.item_code].total_issues += Number(row.issues) || 0;
+    aggregated[row.item_code].total_revenue += (Number(row.issues) || 0) * (Number(row.price) || 0);
+  });
+
+  const container = $("auditResultContainer");
+  container.replaceChildren();
+
+  const table = document.createElement("table");
+  table.className = "w-full text-left border-collapse border";
+  table.innerHTML = `
+    <thead>
+      <tr class="bg-slate-900 text-white text-[11px]">
+        <th class="p-2 border">ID</th>
+        <th class="p-2 border">Description</th>
+        <th class="p-2 border">Category</th>
+        <th class="p-2 border text-center">Total Added</th>
+        <th class="p-2 border text-center">Total Issues</th>
+        <th class="p-2 border text-right">Est. Revenue</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y text-[11px]"></tbody>
+  `;
+
+  const tbody = table.querySelector("tbody");
+  Object.values(aggregated).forEach(item => {
+    const tr = document.createElement("tr");
+    tr.className = "hover:bg-slate-50";
+    tr.innerHTML = `
+      <td class="p-2 border font-mono">${item.item_code}</td>
+      <td class="p-2 border font-bold">${item.description}</td>
+      <td class="p-2 border">${item.category}</td>
+      <td class="p-2 border text-center text-emerald-600">+${item.total_added} ${item.unit}</td>
+      <td class="p-2 border text-center text-amber-600">-${item.total_issues} ${item.unit}</td>
+      <td class="p-2 border text-right font-mono text-emerald-600">$${item.total_revenue.toFixed(2)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  container.appendChild(table);
+}
+
+// Depot & Account Manager
+async function openUserManager() {
+  if (!isManager()) return;
+  await loadLocationsListModal();
+  await loadAccountsListModal();
+  $("userManagerModal").classList.remove("hidden");
+  $("userManagerModal").classList.add("flex");
+}
+
+function closeUserManager() {
+  $("userManagerModal").classList.add("hidden");
+  $("userManagerModal").classList.remove("flex");
+}
+
+async function loadLocationsListModal() {
+  const { data } = await db.from('locations').select('*').order('name');
+  const container = $("locationList");
+  container.replaceChildren();
+
+  if (data) {
+    data.forEach(loc => {
+      const div = document.createElement("div");
+      div.className = "flex justify-between items-center bg-slate-50 border p-2 rounded-lg text-xs";
+      div.innerHTML = `
+        <span class="font-bold">${loc.name}</span>
+        <button onclick="deleteLocation('${loc.name}')" class="text-rose-600 hover:underline font-semibold"><i class="fa-solid fa-trash mr-1"></i>Delete</button>
+      `;
+      container.appendChild(div);
+    });
+  }
+}
+
+async function createLocation(e) {
+  e.preventDefault();
+  if (!isManager()) return;
+  const name = $("newLocationName").value.trim();
+  if (!name) return;
+
+  const { error } = await db.rpc('create_location', {
+    p_actor_username: currentUser.username,
+    p_name: name
+  });
+  if (error) {
+    alert("Location already exists or error occurred: " + error.message);
+    return;
+  }
+
+  $("newLocationName").value = "";
+  await loadLocations();
+  await loadLocationsListModal();
+}
+
+async function deleteLocation(name) {
+  if (!isManager()) return;
+  if (confirm(`Are you sure you want to delete depot "${name}"?`)) {
+    const { error } = await db.rpc('delete_location', {
+      p_actor_username: currentUser.username,
+      p_name: name
+    });
+    if (error) {
+      alert("Error deleting location: " + error.message);
+      return;
+    }
+    await loadLocations();
+    await loadLocationsListModal();
+  }
+}
+
+async function loadAccountsListModal() {
+  const { data, error } = await db.rpc('list_store_users', {
+    p_actor_username: currentUser.username
+  });
+  const container = $("accountList");
+  container.replaceChildren();
+
+  if (error) {
+    container.innerHTML = `<div class="text-rose-600 text-xs">Could not load accounts: ${error.message}</div>`;
+    return;
+  }
+
+  if (data) {
+    data.forEach(u => {
+      const div = document.createElement("div");
+      div.className = "flex justify-between items-center bg-slate-50 border p-2 rounded-lg text-xs";
+      div.innerHTML = `
+        <div><b>${u.username}</b> (${u.name}) - <span class="text-brand-600">${u.role}</span> @ <span class="font-semibold">${u.location}</span>
+        ${u.disabled ? ' <span class="text-rose-600">(Disabled)</span>' : ''}</div>
+        <div class="flex items-center gap-2">
+          <button onclick="openEditUserModal(${u.id}, '${u.username}', '${(u.name || '').replace(/'/g, "\\'")}', '${u.role}', '${u.location}')" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-2 py-1 rounded font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
+          ${u.username !== 'admin' ? `<button onclick="toggleUser(${u.id}, ${u.disabled})" class="${u.disabled ? 'text-emerald-600' : 'text-rose-600'} font-bold hover:underline">${u.disabled ? 'Enable' : 'Disable'}</button>` : ''}
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  }
+}
+
+async function createAccount(e) {
+  e.preventDefault();
+  if (!isManager()) return;
+  const username = $("newUsername").value.trim();
+  const name = $("newDisplayName").value.trim();
+  const password = $("newPassword").value.trim();
+  const role = $("newUserRole").value;
+  const location = $("newUserLocation").value;
+
+  if (password.length < 8) {
+    alert("Password must be at least 8 characters.");
+    return;
+  }
+
+  const { error } = await db.rpc('create_store_user', {
+    p_actor_username: currentUser.username,
+    p_username: username,
+    p_name: name,
+    p_password: password,
+    p_role: role,
+    p_location: location
+  });
+
+  if (error) {
+    alert("Could not create account: " + error.message);
+    return;
+  }
+
+  $("newUsername").value = "";
+  $("newDisplayName").value = "";
+  $("newPassword").value = "";
+  await loadAccountsListModal();
+  alert("Account created successfully (password is hashed).");
+}
+
+async function toggleUser(id, currentStatus) {
+  if (!isManager()) return;
+  const { error } = await db.rpc('toggle_store_user', {
+    p_actor_username: currentUser.username,
+    p_user_id: id,
+    p_disabled: !currentStatus
+  });
+  if (error) {
+    alert("Error: " + error.message);
+    return;
+  }
+  await loadAccountsListModal();
+}
+
+async function openEditUserModal(userId, username, fullName, role, location) {
+  if (!isManager()) return;
+  $("editUserId").value = userId;
+  $("editUsernameDisplay").value = username || "";
+  $("editUserFullName").value = fullName || "";
+  $("editUserRole").value = role || "Storekeeper";
+  $("editUserLocation").value = location || "";
+  $("editUserPassword").value = "";
+
+  $("editUserModal").classList.remove("hidden");
+  $("editUserModal").classList.add("flex");
+}
+
+function closeEditUserModal() {
+  $("editUserModal").classList.add("hidden");
+  $("editUserModal").classList.remove("flex");
+}
+
+async function saveUserEdits(e) {
+  e.preventDefault();
+  if (!isManager()) return;
+  const id = Number($("editUserId").value);
+  const name = $("editUserFullName").value.trim();
+  const role = $("editUserRole").value;
+  const location = $("editUserLocation").value;
+  const newPassword = $("editUserPassword").value.trim();
+
+  if (newPassword && newPassword.length < 8) {
+    alert("Password must be at least 8 characters long.");
+    return;
+  }
+
+  const { error } = await db.rpc('update_store_user', {
+    p_actor_username: currentUser.username,
+    p_user_id: id,
+    p_name: name,
+    p_role: role,
+    p_location: location,
+    p_new_password: newPassword || null
+  });
+
+  if (error) {
+    alert("Error updating user: " + error.message);
+    return;
+  }
+
+  closeEditUserModal();
+  await loadAccountsListModal();
+  alert("User account updated successfully!");
+}
+
+function exportCSV() {
+  if (!currentItems.length) { alert("No data to export."); return; }
+  let csv = "ID,Description,Category,Unit,Opening,Added,Issues,Closing,Cost Price,Sale Price,Est. Revenue,Comments\n";
+  currentItems.forEach(i => {
+    const closing = Number(i.opening) + Number(i.added) - Number(i.issues);
+    const rev = Number(i.issues) * Number(i.price);
+    csv += `"${i.item_code}","${i.description}","${i.category}","${i.unit}",${i.opening},${i.added},${i.issues},${closing},${i.cost},${i.price},${rev.toFixed(2)},"${i.comments || ''}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `inventory_${activeLocation}_${dateKey()}.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   MASTER EXCEL TEMPLATE – Download & Upload
+   ============================================================ */
+
+function downloadMasterTemplate() {
+  if (!isManager()) return;
+
+  const wb = XLSX.utils.book_new();
+
+  const headers = [
+    "Item Code",
+    "Description",
+    "Category",
+    "Unit",
+    "Cost Price",
+    "Sale Price",
+    "Opening Stock"
+  ];
+
+  const sampleData = [
+    headers,
+    // Empty example row so users see the correct format
+    ["", "", "Dry Food Items", "Kg", 0.00, 0.00, 0]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(sampleData);
+  ws["!cols"] = [
+    { wch: 12 }, { wch: 28 }, { wch: 18 }, { wch: 10 },
+    { wch: 12 }, { wch: 12 }, { wch: 14 }
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, "Master Catalog");
+
+  const instructions = [
+    ["GAS GENERAL STORE – MASTER CATALOG TEMPLATE"],
+    [""],
+    ["INSTRUCTIONS"],
+    ["1. Fill one row per item."],
+    ["2. Item Code: leave blank to auto-generate the next sequential 3-digit code."],
+    ["3. Description, Category and Unit are GLOBAL – they will appear in every depot."],
+    ["4. Opening Stock is applied only to the currently selected depot. Other depots start at zero."],
+    ["5. Allowed Categories: Dry Food Items | Soft Drinks | Alcoholic | Frozen | Fresh Food Items"],
+    ["6. Save the file as .xlsx and use the “Upload Excel” button in the system."],
+    [""],
+    ["NOTES"],
+    ["• Existing Item Codes will be updated (global metadata + stock for selected depot)."],
+    ["• New Item Codes (or blank) will be created in ALL depots."],
+    ["• Cost Price and Sale Price are also treated as global master data."]
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(instructions);
+  ws2["!cols"] = [{ wch: 90 }];
+  XLSX.utils.book_append_sheet(wb, ws2, "Instructions");
+
+  XLSX.writeFile(wb, `GAS_Master_Catalog_Template_${localDateString()}.xlsx`);
+  showSaveStatus("Template downloaded");
+}
+
+async function handleExcelUpload(e) {
+  if (!isManager()) return;
+  const file = e.target.files[0];
+  if (!file) return;
+
+  e.target.value = ""; // allow re-selecting the same file
+
+  if (!isOnline) {
+    alert("Excel upload requires an internet connection.");
+    return;
+  }
+
+  try {
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data, { type: "array" });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+    if (!rows.length) {
+      alert("The Excel file is empty.");
+      return;
+    }
+
+    // Normalise header names (case-insensitive)
+    const normalised = rows.map(row => {
+      const out = {};
+      Object.keys(row).forEach(k => {
+        out[k.trim().toLowerCase()] = row[k];
+      });
+      return out;
+    });
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    showSaveStatus("Uploading… please wait");
+
+    for (const row of normalised) {
+      try {
+        let itemCode = String(row["item code"] || row["itemcode"] || row["id"] || "").trim();
+        const description = String(row["description"] || "").trim();
+        const category = String(row["category"] || "Dry Food Items").trim();
+        const unit = String(row["unit"] || "Pc").trim();
+        const cost = Number(row["cost price"] || row["cost"] || 0) || 0;
+        const price = Number(row["sale price"] || row["price"] || 0) || 0;
+        const opening = Number(row["opening stock"] || row["opening"] || 0) || 0;
+
+        if (!description) {
+          errorCount++;
+          errors.push("Skipped row with empty Description");
+          continue;
+        }
+
+        // Auto-generate code if blank
+        if (!itemCode) {
+          const { data: nextCode, error } = await db.rpc("get_next_item_code");
+          if (error) throw error;
+          itemCode = nextCode || "001";
+        }
+
+        // Does this item already exist?
+        const { data: existing } = await db
+          .from("inventory_entries")
+          .select("item_code")
+          .eq("item_code", itemCode)
+          .limit(1);
+
+        const isNew = !existing || existing.length === 0;
+
+        if (isNew) {
+          // Atomic create in EVERY depot
+          const { error } = await db.rpc("create_item_all_locations", {
+            p_username: currentUser.username,
+            p_entry_date: dateKey(),
+            p_item_code: itemCode,
+            p_description: description,
+            p_category: category,
+            p_unit: unit,
+            p_primary_location: activeLocation,
+            p_opening: opening,
+            p_added: 0,
+            p_issues: 0,
+            p_cost: cost,
+            p_price: price,
+            p_comments: "Imported from Excel"
+          });
+          if (error) throw error;
+        } else {
+          // Existing item → update global metadata + stock for active depot
+          const { error } = await db.rpc("secure_upsert_inventory", {
+            p_username: currentUser.username,
+            p_location: activeLocation,
+            p_entry_date: dateKey(),
+            p_item_code: itemCode,
+            p_description: description,
+            p_category: category,
+            p_unit: unit,
+            p_opening: opening,
+            p_added: 0,
+            p_issues: 0,
+            p_cost: cost,
+            p_price: price,
+            p_comments: "Updated from Excel"
+          });
+          if (error) throw error;
+        }
+
+        successCount++;
+      } catch (err) {
+        errorCount++;
+        errors.push(err.message || String(err));
       }
     }
 
-    function showSaveStatus() {
-      elements.saveStatus.classList.remove('opacity-0');
-      setTimeout(() => elements.saveStatus.classList.add('opacity-0'), 2500);
+    loadCloudData();
+
+    let msg = `Upload finished.\n\nSuccessfully processed: ${successCount} item(s)`;
+    if (errorCount) {
+      msg += `\nErrors: ${errorCount}\n\n${errors.slice(0, 5).join("\n")}`;
+      if (errors.length > 5) msg += `\n… and ${errors.length - 5} more`;
+    }
+    alert(msg);
+    showSaveStatus(`${successCount} items imported`);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to read Excel file: " + (err.message || err));
+  }
+}
+
+/* ============================================================
+   BACKUP & RESTORE
+   ============================================================ */
+
+async function downloadInventoryBackup() {
+  if (!isManager()) return;
+  if (!isOnline) {
+    alert("Backup requires an internet connection so all depots can be included.");
+    return;
+  }
+
+  try {
+    showSaveStatus("Building backup…");
+
+    // Fetch inventory for the selected date across ALL locations
+    const { data, error } = await db
+      .from("inventory_entries")
+      .select("*")
+      .eq("entry_date", dateKey())
+      .order("location")
+      .order("item_code");
+
+    if (error) throw error;
+    if (!data || !data.length) {
+      alert("No inventory data found for " + dateKey());
+      return;
     }
 
-    // -------------------------------------------------------------
-    // INITIALIZATION & EVENT LISTENERS
-    // -------------------------------------------------------------
-    window.addEventListener('DOMContentLoaded', async () => {
-      elements.selectedDate.value = state.selectedDate;
+    const headers = [
+      "Location",
+      "Item Code",
+      "Description",
+      "Category",
+      "Unit",
+      "Opening",
+      "Added",
+      "Issues",
+      "Cost Price",
+      "Sale Price",
+      "Comments",
+      "Entry Date"
+    ];
 
-      // Populate locations dropdown
-      elements.locationSelector.innerHTML = state.locations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
-      elements.locationSelector.value = state.selectedLocation;
-
-      elements.locationSelector.addEventListener('change', (e) => {
-        state.selectedLocation = e.value || e.target.value;
-        renderTable();
-      });
-
-      elements.selectedDate.addEventListener('change', (e) => {
-        state.selectedDate = e.target.value;
-        renderTable();
-      });
-
-      // Category filters
-      document.querySelectorAll('.cat-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          document.querySelectorAll('.cat-btn').forEach(b => {
-            b.className = "cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700";
-          });
-          e.target.className = "cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white";
-          state.selectedCategory = e.target.dataset.category;
-          renderTable();
-        });
-      });
-
-      // Search bar
-      document.getElementById('searchInput').addEventListener('input', (e) => {
-        state.searchQuery = e.target.value;
-        renderTable();
-      });
-
-      // Load initial Cloud & Realtime sync
-      await loadCloudData();
-      setupRealtimeSubscription();
+    const rows = [headers];
+    data.forEach(r => {
+      rows.push([
+        r.location,
+        r.item_code,
+        r.description,
+        r.category,
+        r.unit,
+        Number(r.opening) || 0,
+        Number(r.added) || 0,
+        Number(r.issues) || 0,
+        Number(r.cost) || 0,
+        Number(r.price) || 0,
+        r.comments || "",
+        r.entry_date
+      ]);
     });
-  </script>
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 14 }, { wch: 10 }, { wch: 28 }, { wch: 16 }, { wch: 8 },
+      { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 10 },
+      { wch: 24 }, { wch: 12 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, "Inventory Backup");
+
+    // Instructions sheet
+    const info = [
+      ["GAS GENERAL STORE – INVENTORY BACKUP"],
+      ["Generated: " + new Date().toISOString()],
+      ["Backup Date (entry_date): " + dateKey()],
+      ["Depots included: " + [...new Set(data.map(d => d.location))].join(", ")],
+      ["Total rows: " + data.length],
+      [""],
+      ["How to restore:"],
+      ["1. Keep this file safe."],
+      ["2. In the system, click Restore and select this file."],
+      ["3. Data will be written back for each Location + Item Code on the Entry Date."],
+      ["4. Global fields (Description, Category, Unit, Cost, Price) are updated everywhere."]
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(info);
+    ws2["!cols"] = [{ wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "Info");
+
+    const filename = `GAS_Inventory_Backup_${dateKey()}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    showSaveStatus("Backup downloaded");
+  } catch (err) {
+    console.error(err);
+    alert("Backup failed: " + (err.message || err));
+  }
+}
+
+async function handleInventoryRestore(e) {
+  if (!isManager()) return;
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = "";
+
+  if (!isOnline) {
+    alert("Restore requires an internet connection.");
+    return;
+  }
+
+  if (!confirm(
+    "Restore will overwrite stock quantities for matching Location + Item Code + Date from this file.\n\n" +
+    "Global fields (Description, Category, Unit, Cost, Price) will also be updated.\n\nContinue?"
+  )) {
+    return;
+  }
+
+  try {
+    showSaveStatus("Restoring… please wait");
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+    if (!rows.length) {
+      alert("Backup file is empty.");
+      return;
+    }
+
+    const normalised = rows.map(row => {
+      const out = {};
+      Object.keys(row).forEach(k => {
+        out[k.trim().toLowerCase()] = row[k];
+      });
+      return out;
+    });
+
+    let success = 0;
+    let failed = 0;
+    const errors = [];
+
+    for (const row of normalised) {
+      try {
+        const location = String(row["location"] || "").trim();
+        const itemCode = String(row["item code"] || row["itemcode"] || row["id"] || "").trim();
+        const description = String(row["description"] || "").trim();
+        const category = String(row["category"] || "Dry Food Items").trim();
+        const unit = String(row["unit"] || "Pc").trim();
+        const opening = Number(row["opening"] || 0) || 0;
+        const added = Number(row["added"] || 0) || 0;
+        const issues = Number(row["issues"] || 0) || 0;
+        const cost = Number(row["cost price"] || row["cost"] || 0) || 0;
+        const price = Number(row["sale price"] || row["price"] || 0) || 0;
+        const comments = String(row["comments"] || "Restored from backup").trim();
+        const entryDate = String(row["entry date"] || row["entry_date"] || dateKey()).trim().slice(0, 10);
+
+        if (!location || !itemCode || !description) {
+          failed++;
+          errors.push("Skipped incomplete row");
+          continue;
+        }
+
+        const { error } = await db.rpc("secure_upsert_inventory", {
+          p_username: currentUser.username,
+          p_location: location,
+          p_entry_date: entryDate,
+          p_item_code: itemCode,
+          p_description: description,
+          p_category: category,
+          p_unit: unit,
+          p_opening: opening,
+          p_added: added,
+          p_issues: issues,
+          p_cost: cost,
+          p_price: price,
+          p_comments: comments
+        });
+        if (error) throw error;
+        success++;
+      } catch (err) {
+        failed++;
+        errors.push(err.message || String(err));
+      }
+    }
+
+    loadCloudData();
+
+    let msg = `Restore finished.\n\nRestored: ${success} row(s)`;
+    if (failed) {
+      msg += `\nFailed: ${failed}\n\n${errors.slice(0, 5).join("\n")}`;
+    }
+    alert(msg);
+    showSaveStatus(`${success} rows restored`);
+  } catch (err) {
+    console.error(err);
+    alert("Restore failed: " + (err.message || err));
+  }
+}
+
+/* ============================================================
+   RESET STOCK – zero all quantities for selected date
+   ============================================================ */
+
+async function resetAllStock() {
+  if (!isManager()) return;
+  if (!isOnline) {
+    alert("Reset requires an internet connection.");
+    return;
+  }
+
+  const scopeAll = confirm(
+    "RESET STOCK\n\n" +
+    "OK  = Reset ALL depots for " + dateKey() + "\n" +
+    "Cancel = Reset only the active depot (" + activeLocation + ")\n\n" +
+    "This sets Opening, Added and Issues to 0 and clears comments.\n" +
+    "Item names, categories and units are kept.\n\n" +
+    "This cannot be undone (take a Backup first)."
+  );
+
+  // Second confirm always
+  if (!confirm(
+    "FINAL CONFIRMATION\n\n" +
+    "Zero all stock quantities for " + dateKey() +
+    (scopeAll ? " in EVERY depot?" : " in " + activeLocation + " only?")
+  )) {
+    return;
+  }
+
+  try {
+    showSaveStatus("Resetting stock…");
+
+    let query = db
+      .from("inventory_entries")
+      .select("*")
+      .eq("entry_date", dateKey());
+
+    if (!scopeAll) {
+      query = query.eq("location", activeLocation);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    if (!data || !data.length) {
+      alert("No inventory rows found for that date.");
+      return;
+    }
+
+    let success = 0;
+    let failed = 0;
+
+    for (const row of data) {
+      try {
+        const { error: upErr } = await db.rpc("secure_upsert_inventory", {
+          p_username: currentUser.username,
+          p_location: row.location,
+          p_entry_date: dateKey(),
+          p_item_code: row.item_code,
+          p_description: row.description,
+          p_category: row.category,
+          p_unit: row.unit,
+          p_opening: 0,
+          p_added: 0,
+          p_issues: 0,
+          p_cost: row.cost,
+          p_price: row.price,
+          p_comments: ""
+        });
+        if (upErr) throw upErr;
+        success++;
+      } catch (err) {
+        console.error(err);
+        failed++;
+      }
+    }
+
+    // Clear local cache for current view
+    currentItems = currentItems.map(i => ({
+      ...i,
+      opening: 0,
+      added: 0,
+      issues: 0,
+      comments: ""
+    }));
+    await cacheInventory(activeLocation, dateKey(), currentItems);
+
+    loadCloudData();
+    alert(
+      "Stock reset complete.\n\n" +
+      "Rows zeroed: " + success +
+      (failed ? "\nFailed: " + failed : "")
+    );
+    showSaveStatus("Stock reset to zero");
+  } catch (err) {
+    console.error(err);
+    alert("Reset failed: " + (err.message || err));
+  }
+}
+
+async function batchDeleteSelected() {
+  if (!isManager()) return;
+  if (!isOnline) {
+    alert("Batch delete requires an internet connection.");
+    return;
+  }
+
+  const checked = [...document.querySelectorAll(".item-check:checked")];
+  if (!checked.length) {
+    alert("Select at least one item to delete.");
+    return;
+  }
+
+  const codes = checked.map(cb => cb.dataset.code).filter(Boolean);
+  if (!confirm(
+    `Permanently delete ${codes.length} item(s) from ALL depots and ALL dates?\n\n` +
+    codes.slice(0, 10).join(", ") + (codes.length > 10 ? "…" : "") +
+    `\n\nThis cannot be undone.`
+  )) return;
+
+  try {
+    showSaveStatus("Deleting…");
+    const { data, error } = await db.rpc("delete_master_items_batch", {
+      p_username: currentUser.username,
+      p_item_codes: codes
+    });
+    if (error) throw error;
+
+    currentItems = currentItems.filter(i => !codes.includes(i.item_code));
+    await cacheInventory(activeLocation, dateKey(), currentItems);
+    renderTable();
+    updateKPIs();
+    loadCloudData();
+    alert(`Deleted ${codes.length} item(s) globally (${data || "?"} rows removed).`);
+    showSaveStatus("Batch delete complete");
+  } catch (err) {
+    console.error(err);
+    // Fallback: delete one by one
+    let ok = 0;
+    for (const code of codes) {
+      try {
+        const { error } = await db.rpc("delete_master_item", {
+          p_username: currentUser.username,
+          p_item_code: code
+        });
+        if (!error) ok++;
+      } catch {}
+    }
+    loadCloudData();
+    alert(`Batch RPC failed. Deleted ${ok}/${codes.length} via fallback.\n${err.message || err}`);
+  }
+}
+</script>
 </body>
 </html>
