@@ -108,12 +108,25 @@
           <span id="displayUserName" class="font-semibold text-white">Signed out</span>
           <button id="logoutBtn" type="button" class="text-slate-400 hover:text-rose-400 ml-1 transition" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
         </div>
-        <button id="downloadTemplateBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition" title="Download Excel master template"><i class="fa-solid fa-file-excel text-emerald-400 mr-1"></i>Template</button>
-        <label id="uploadExcelLabel" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition cursor-pointer" title="Upload filled Excel template">
+        <button id="reorderBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 transition"><i class="fa-solid fa-cart-flatbed text-amber-400 mr-1"></i>Low Stock</button>
+        <button id="transferBtn" type="button" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 transition"><i class="fa-solid fa-right-left text-blue-400 mr-1"></i>Transfer Stock</button>
+        <button id="requestBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 transition"><i class="fa-solid fa-clipboard-list text-emerald-400 mr-1"></i>Requisitions</button>
+        <button id="auditReportBtn" type="button" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 transition"><i class="fa-solid fa-chart-line text-purple-400 mr-1"></i>Audit Report</button>
+        <button id="manageUsersBtn" type="button" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-users-gear mr-1"></i>Depots & Users</button>
+        <button id="exportBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition"><i class="fa-solid fa-file-csv text-emerald-400 mr-1"></i>CSV</button>
+        <button id="printBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition"><i class="fa-solid fa-print text-amber-400 mr-1"></i>Print</button>
+        <button id="downloadTemplateBtn" type="button" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition" title="Download Excel master template"><i class="fa-solid fa-file-excel text-emerald-400 mr-1"></i>Template</button>
+        <label id="uploadExcelLabel" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition cursor-pointer" title="Upload filled Excel template">
           <i class="fa-solid fa-file-import text-blue-400 mr-1"></i>Upload Excel
           <input type="file" id="uploadExcelInput" accept=".xlsx,.xls" class="hidden">
         </label>
-        <button id="newItemBtn" type="button" class="bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-plus mr-1"></i>New Item</button>
+        <button id="backupBtn" type="button" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition" title="Download full inventory backup"><i class="fa-solid fa-download text-sky-400 mr-1"></i>Backup</button>
+        <label id="restoreLabel" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition cursor-pointer" title="Restore inventory from backup file">
+          <i class="fa-solid fa-rotate-left text-amber-400 mr-1"></i>Restore
+          <input type="file" id="restoreInput" accept=".xlsx,.xls,.json" class="hidden">
+        </label>
+        <button id="resetStockBtn" type="button" class="hidden bg-rose-700 hover:bg-rose-800 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-md transition" title="Zero all stock quantities for selected date"><i class="fa-solid fa-eraser mr-1"></i>Reset Stock</button>
+        <button id="newItemBtn" type="button" class="hidden bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-plus mr-1"></i>New Item</button>
       </div>
     </div>
   </header>
@@ -268,7 +281,7 @@
     const SUPABASE_URL = "https://chfpcwlpmzcyorifzpja.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZnBjd2xwbXpjeW9yaWZ6cGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwMjE5MzEsImV4cCI6MjEwOTU5NzkzMX0.73G3XXghDxrwVxbDibXemM5LB57LHUZdw4nK_Nc4lLo";
     
-    // Safely assign Supabase instance to dbClient to prevent duplicate identifier declaration crashes
+    // Assigning to dbClient prevents re-declaration errors
     const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let state = {
@@ -300,15 +313,22 @@
       selectedCount: document.getElementById('selectedCount'),
       selectAllItems: document.getElementById('selectAllItems'),
       uploadExcelInput: document.getElementById('uploadExcelInput'),
+      uploadExcelLabel: document.getElementById('uploadExcelLabel'),
       downloadTemplateBtn: document.getElementById('downloadTemplateBtn'),
       saveStatus: document.getElementById('saveStatus'),
       itemModal: document.getElementById('itemModal'),
       itemForm: document.getElementById('itemForm'),
-      newItemBtn: document.getElementById('newItemBtn')
+      newItemBtn: document.getElementById('newItemBtn'),
+      transferBtn: document.getElementById('transferBtn'),
+      auditReportBtn: document.getElementById('auditReportBtn'),
+      manageUsersBtn: document.getElementById('manageUsersBtn'),
+      backupBtn: document.getElementById('backupBtn'),
+      restoreLabel: document.getElementById('restoreLabel'),
+      resetStockBtn: document.getElementById('resetStockBtn')
     };
 
     // -------------------------------------------------------------
-    // LOGIN & AUTHENTICATION
+    // LOGIN & AUTHENTICATION (UNHIDE HEADER BUTTONS)
     // -------------------------------------------------------------
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -317,7 +337,6 @@
       const err = document.getElementById('loginError');
       err.classList.add('hidden');
 
-      // Emergency Default Admin Fallback
       if (u.toLowerCase() === 'admin' && p === 'admin2026') {
         state.user = { username: 'admin', role: 'Manager', location: 'Juba Depot' };
         completeLogin();
@@ -349,9 +368,20 @@
       document.getElementById('displayUserName').textContent = `${state.user.username} (${state.user.role})`;
       document.getElementById('locationBadge').textContent = state.user.location;
       
+      // Unhide manager specific layout elements and header buttons
       if (state.user.role === 'Manager') {
         document.getElementById('managerLocationBox').classList.remove('hidden');
         document.getElementById('managerLocationBox').classList.add('flex');
+        
+        elements.transferBtn.classList.remove('hidden');
+        elements.auditReportBtn.classList.remove('hidden');
+        elements.manageUsersBtn.classList.remove('hidden');
+        elements.downloadTemplateBtn.classList.remove('hidden');
+        elements.uploadExcelLabel.classList.remove('hidden');
+        elements.backupBtn.classList.remove('hidden');
+        elements.restoreLabel.classList.remove('hidden');
+        elements.resetStockBtn.classList.remove('hidden');
+        elements.newItemBtn.classList.remove('hidden');
       }
 
       state.selectedLocation = state.user.location;
