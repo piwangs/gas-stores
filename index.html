@@ -100,6 +100,12 @@
           <i class="fa-solid fa-file-import text-blue-400 mr-1"></i>Upload Excel
           <input type="file" id="uploadExcelInput" accept=".xlsx,.xls" class="hidden">
         </label>
+        <button id="backupBtn" type="button" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition" title="Download full inventory backup"><i class="fa-solid fa-download text-sky-400 mr-1"></i>Backup</button>
+        <label id="restoreLabel" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition cursor-pointer" title="Restore inventory from backup file">
+          <i class="fa-solid fa-rotate-left text-amber-400 mr-1"></i>Restore
+          <input type="file" id="restoreInput" accept=".xlsx,.xls,.json" class="hidden">
+        </label>
+        <button id="resetStockBtn" type="button" class="hidden bg-rose-700 hover:bg-rose-800 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-md transition" title="Zero all stock quantities for selected date"><i class="fa-solid fa-eraser mr-1"></i>Reset Stock</button>
         <button id="newItemBtn" type="button" class="hidden bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-plus mr-1"></i>New Item</button>
       </div>
     </div>
@@ -159,7 +165,10 @@
         <button data-category="Frozen" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">Frozen</button>
         <button data-category="Fresh Food Items" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">Fresh Food</button>
       </div>
-      <input id="searchInput" type="search" placeholder="Search item..." class="w-full md:w-64 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+      <div class="flex items-center gap-2">
+        <input id="searchInput" type="search" placeholder="Search item..." class="w-full md:w-64 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        <button id="batchDeleteBtn" type="button" class="hidden bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-trash mr-1"></i>Delete Selected</button>
+      </div>
     </section>
 
     <!-- Inventory Data Table -->
@@ -168,6 +177,7 @@
         <table class="w-full text-left border-collapse" id="inventoryTable">
           <thead>
             <tr class="bg-slate-900 text-slate-200 text-xs uppercase tracking-wider font-semibold">
+              <th class="p-3 text-center w-8"><input type="checkbox" id="selectAllItems" class="rounded" title="Select all"></th>
               <th class="p-3">ID</th>
               <th class="p-3">Item Description</th>
               <th class="p-3">Category</th>
@@ -677,6 +687,13 @@ function bindEvents() {
   });
   $("downloadTemplateBtn").addEventListener("click", downloadMasterTemplate);
   $("uploadExcelInput").addEventListener("change", handleExcelUpload);
+  $("backupBtn").addEventListener("click", downloadInventoryBackup);
+  $("restoreInput").addEventListener("change", handleInventoryRestore);
+  $("resetStockBtn").addEventListener("click", resetAllStock);
+  $("batchDeleteBtn").addEventListener("click", batchDeleteSelected);
+  $("selectAllItems")?.addEventListener("change", (e) => {
+    document.querySelectorAll(".item-check").forEach(cb => { cb.checked = e.target.checked; });
+  });
   $("newItemBtn").addEventListener("click", openNewItemModal);
   $("reorderBtn").addEventListener("click", openReorderModal);
   $("transferBtn").addEventListener("click", openTransferModal);
@@ -750,6 +767,10 @@ async function handleLogin(e) {
     $("manageUsersBtn").classList.remove("hidden");
     $("downloadTemplateBtn").classList.remove("hidden");
     $("uploadExcelLabel").classList.remove("hidden");
+    $("backupBtn").classList.remove("hidden");
+    $("restoreLabel").classList.remove("hidden");
+    $("resetStockBtn").classList.remove("hidden");
+    $("batchDeleteBtn").classList.remove("hidden");
   } else {
     activeLocation = currentUser.location;
     $("managerLocationBox").classList.add("hidden");
@@ -759,6 +780,10 @@ async function handleLogin(e) {
     $("manageUsersBtn").classList.add("hidden");
     $("downloadTemplateBtn").classList.add("hidden");
     $("uploadExcelLabel").classList.add("hidden");
+    $("backupBtn").classList.add("hidden");
+    $("restoreLabel").classList.add("hidden");
+    $("resetStockBtn").classList.add("hidden");
+    $("batchDeleteBtn").classList.add("hidden");
   }
 
   $("locationBadge").textContent = activeLocation;
@@ -912,6 +937,7 @@ function renderTable() {
     const tr = document.createElement("tr");
     tr.className = "hover:bg-slate-50";
     tr.innerHTML = `
+      <td class="p-3 text-center">${isManager() ? `<input type="checkbox" class="item-check rounded" data-code="${item.item_code}">` : ''}</td>
       <td class="p-3 font-mono font-semibold text-slate-500">${item.item_code}</td>
       <td class="p-3 font-bold text-slate-800">${item.description}</td>
       <td class="p-3">${item.category}</td>
@@ -930,6 +956,10 @@ function renderTable() {
     `;
     tbody.appendChild(tr);
   });
+
+  // Reset select-all checkbox
+  const selAll = $("selectAllItems");
+  if (selAll) selAll.checked = false;
 }
 
 function updateKPIs() {
@@ -1120,24 +1150,30 @@ async function saveItem(e) {
 
   // ---------- ONLINE PATH ----------
   try {
+    // Ensure locations list is loaded
+    if (!allLocationsList.length) await loadLocations();
+
     if (isNewItem && isManager()) {
-      // Brand-new master item → create a zero-stock row in EVERY depot
-      // so the item immediately appears everywhere.
-      for (const loc of allLocationsList) {
-        const locPayload = {
-          ...basePayload,
-          p_location: loc,
-          p_opening: (loc === targetLocation) ? opening : 0,
-          p_added:   (loc === targetLocation) ? added   : 0,
-          p_issues:  (loc === targetLocation) ? issues  : 0
-        };
-        const { error } = await db.rpc('secure_upsert_inventory', locPayload);
-        if (error) throw error;
-      }
+      // Atomic server-side create in EVERY depot (one transaction)
+      const { error } = await db.rpc('create_item_all_locations', {
+        p_username: currentUser.username,
+        p_entry_date: dateKey(),
+        p_item_code: itemCode,
+        p_description: globalFields.p_description,
+        p_category: globalFields.p_category,
+        p_unit: globalFields.p_unit,
+        p_primary_location: targetLocation,
+        p_opening: opening,
+        p_added: added,
+        p_issues: issues,
+        p_cost: basePayload.p_cost,
+        p_price: basePayload.p_price,
+        p_comments: basePayload.p_comments
+      });
+      if (error) throw error;
       showSaveStatus("New item created in ALL depots");
     } else {
-      // Existing item or Storekeeper edit → only touch the chosen location
-      // (backend still cascades Description / Category / Unit globally)
+      // Existing item or Storekeeper edit
       const { error } = await db.rpc('secure_upsert_inventory', {
         ...basePayload,
         p_location: targetLocation,
@@ -1919,25 +1955,23 @@ async function handleExcelUpload(e) {
         const isNew = !existing || existing.length === 0;
 
         if (isNew) {
-          // Create in EVERY depot
-          for (const loc of allLocationsList) {
-            const { error } = await db.rpc("secure_upsert_inventory", {
-              p_username: currentUser.username,
-              p_location: loc,
-              p_entry_date: dateKey(),
-              p_item_code: itemCode,
-              p_description: description,
-              p_category: category,
-              p_unit: unit,
-              p_opening: (loc === activeLocation) ? opening : 0,
-              p_added: 0,
-              p_issues: 0,
-              p_cost: cost,
-              p_price: price,
-              p_comments: "Imported from Excel"
-            });
-            if (error) throw error;
-          }
+          // Atomic create in EVERY depot
+          const { error } = await db.rpc("create_item_all_locations", {
+            p_username: currentUser.username,
+            p_entry_date: dateKey(),
+            p_item_code: itemCode,
+            p_description: description,
+            p_category: category,
+            p_unit: unit,
+            p_primary_location: activeLocation,
+            p_opening: opening,
+            p_added: 0,
+            p_issues: 0,
+            p_cost: cost,
+            p_price: price,
+            p_comments: "Imported from Excel"
+          });
+          if (error) throw error;
         } else {
           // Existing item → update global metadata + stock for active depot
           const { error } = await db.rpc("secure_upsert_inventory", {
@@ -1977,6 +2011,356 @@ async function handleExcelUpload(e) {
   } catch (err) {
     console.error(err);
     alert("Failed to read Excel file: " + (err.message || err));
+  }
+}
+
+/* ============================================================
+   BACKUP & RESTORE
+   ============================================================ */
+
+async function downloadInventoryBackup() {
+  if (!isManager()) return;
+  if (!isOnline) {
+    alert("Backup requires an internet connection so all depots can be included.");
+    return;
+  }
+
+  try {
+    showSaveStatus("Building backup…");
+
+    // Fetch inventory for the selected date across ALL locations
+    const { data, error } = await db
+      .from("inventory_entries")
+      .select("*")
+      .eq("entry_date", dateKey())
+      .order("location")
+      .order("item_code");
+
+    if (error) throw error;
+    if (!data || !data.length) {
+      alert("No inventory data found for " + dateKey());
+      return;
+    }
+
+    const headers = [
+      "Location",
+      "Item Code",
+      "Description",
+      "Category",
+      "Unit",
+      "Opening",
+      "Added",
+      "Issues",
+      "Cost Price",
+      "Sale Price",
+      "Comments",
+      "Entry Date"
+    ];
+
+    const rows = [headers];
+    data.forEach(r => {
+      rows.push([
+        r.location,
+        r.item_code,
+        r.description,
+        r.category,
+        r.unit,
+        Number(r.opening) || 0,
+        Number(r.added) || 0,
+        Number(r.issues) || 0,
+        Number(r.cost) || 0,
+        Number(r.price) || 0,
+        r.comments || "",
+        r.entry_date
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 14 }, { wch: 10 }, { wch: 28 }, { wch: 16 }, { wch: 8 },
+      { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 10 },
+      { wch: 24 }, { wch: 12 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, "Inventory Backup");
+
+    // Instructions sheet
+    const info = [
+      ["GAS GENERAL STORE – INVENTORY BACKUP"],
+      ["Generated: " + new Date().toISOString()],
+      ["Backup Date (entry_date): " + dateKey()],
+      ["Depots included: " + [...new Set(data.map(d => d.location))].join(", ")],
+      ["Total rows: " + data.length],
+      [""],
+      ["How to restore:"],
+      ["1. Keep this file safe."],
+      ["2. In the system, click Restore and select this file."],
+      ["3. Data will be written back for each Location + Item Code on the Entry Date."],
+      ["4. Global fields (Description, Category, Unit, Cost, Price) are updated everywhere."]
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(info);
+    ws2["!cols"] = [{ wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "Info");
+
+    const filename = `GAS_Inventory_Backup_${dateKey()}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    showSaveStatus("Backup downloaded");
+  } catch (err) {
+    console.error(err);
+    alert("Backup failed: " + (err.message || err));
+  }
+}
+
+async function handleInventoryRestore(e) {
+  if (!isManager()) return;
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = "";
+
+  if (!isOnline) {
+    alert("Restore requires an internet connection.");
+    return;
+  }
+
+  if (!confirm(
+    "Restore will overwrite stock quantities for matching Location + Item Code + Date from this file.\n\n" +
+    "Global fields (Description, Category, Unit, Cost, Price) will also be updated.\n\nContinue?"
+  )) {
+    return;
+  }
+
+  try {
+    showSaveStatus("Restoring… please wait");
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+    if (!rows.length) {
+      alert("Backup file is empty.");
+      return;
+    }
+
+    const normalised = rows.map(row => {
+      const out = {};
+      Object.keys(row).forEach(k => {
+        out[k.trim().toLowerCase()] = row[k];
+      });
+      return out;
+    });
+
+    let success = 0;
+    let failed = 0;
+    const errors = [];
+
+    for (const row of normalised) {
+      try {
+        const location = String(row["location"] || "").trim();
+        const itemCode = String(row["item code"] || row["itemcode"] || row["id"] || "").trim();
+        const description = String(row["description"] || "").trim();
+        const category = String(row["category"] || "Dry Food Items").trim();
+        const unit = String(row["unit"] || "Pc").trim();
+        const opening = Number(row["opening"] || 0) || 0;
+        const added = Number(row["added"] || 0) || 0;
+        const issues = Number(row["issues"] || 0) || 0;
+        const cost = Number(row["cost price"] || row["cost"] || 0) || 0;
+        const price = Number(row["sale price"] || row["price"] || 0) || 0;
+        const comments = String(row["comments"] || "Restored from backup").trim();
+        const entryDate = String(row["entry date"] || row["entry_date"] || dateKey()).trim().slice(0, 10);
+
+        if (!location || !itemCode || !description) {
+          failed++;
+          errors.push("Skipped incomplete row");
+          continue;
+        }
+
+        const { error } = await db.rpc("secure_upsert_inventory", {
+          p_username: currentUser.username,
+          p_location: location,
+          p_entry_date: entryDate,
+          p_item_code: itemCode,
+          p_description: description,
+          p_category: category,
+          p_unit: unit,
+          p_opening: opening,
+          p_added: added,
+          p_issues: issues,
+          p_cost: cost,
+          p_price: price,
+          p_comments: comments
+        });
+        if (error) throw error;
+        success++;
+      } catch (err) {
+        failed++;
+        errors.push(err.message || String(err));
+      }
+    }
+
+    loadCloudData();
+
+    let msg = `Restore finished.\n\nRestored: ${success} row(s)`;
+    if (failed) {
+      msg += `\nFailed: ${failed}\n\n${errors.slice(0, 5).join("\n")}`;
+    }
+    alert(msg);
+    showSaveStatus(`${success} rows restored`);
+  } catch (err) {
+    console.error(err);
+    alert("Restore failed: " + (err.message || err));
+  }
+}
+
+/* ============================================================
+   RESET STOCK – zero all quantities for selected date
+   ============================================================ */
+
+async function resetAllStock() {
+  if (!isManager()) return;
+  if (!isOnline) {
+    alert("Reset requires an internet connection.");
+    return;
+  }
+
+  const scopeAll = confirm(
+    "RESET STOCK\n\n" +
+    "OK  = Reset ALL depots for " + dateKey() + "\n" +
+    "Cancel = Reset only the active depot (" + activeLocation + ")\n\n" +
+    "This sets Opening, Added and Issues to 0 and clears comments.\n" +
+    "Item names, categories and units are kept.\n\n" +
+    "This cannot be undone (take a Backup first)."
+  );
+
+  // Second confirm always
+  if (!confirm(
+    "FINAL CONFIRMATION\n\n" +
+    "Zero all stock quantities for " + dateKey() +
+    (scopeAll ? " in EVERY depot?" : " in " + activeLocation + " only?")
+  )) {
+    return;
+  }
+
+  try {
+    showSaveStatus("Resetting stock…");
+
+    let query = db
+      .from("inventory_entries")
+      .select("*")
+      .eq("entry_date", dateKey());
+
+    if (!scopeAll) {
+      query = query.eq("location", activeLocation);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    if (!data || !data.length) {
+      alert("No inventory rows found for that date.");
+      return;
+    }
+
+    let success = 0;
+    let failed = 0;
+
+    for (const row of data) {
+      try {
+        const { error: upErr } = await db.rpc("secure_upsert_inventory", {
+          p_username: currentUser.username,
+          p_location: row.location,
+          p_entry_date: dateKey(),
+          p_item_code: row.item_code,
+          p_description: row.description,
+          p_category: row.category,
+          p_unit: row.unit,
+          p_opening: 0,
+          p_added: 0,
+          p_issues: 0,
+          p_cost: row.cost,
+          p_price: row.price,
+          p_comments: ""
+        });
+        if (upErr) throw upErr;
+        success++;
+      } catch (err) {
+        console.error(err);
+        failed++;
+      }
+    }
+
+    // Clear local cache for current view
+    currentItems = currentItems.map(i => ({
+      ...i,
+      opening: 0,
+      added: 0,
+      issues: 0,
+      comments: ""
+    }));
+    await cacheInventory(activeLocation, dateKey(), currentItems);
+
+    loadCloudData();
+    alert(
+      "Stock reset complete.\n\n" +
+      "Rows zeroed: " + success +
+      (failed ? "\nFailed: " + failed : "")
+    );
+    showSaveStatus("Stock reset to zero");
+  } catch (err) {
+    console.error(err);
+    alert("Reset failed: " + (err.message || err));
+  }
+}
+
+async function batchDeleteSelected() {
+  if (!isManager()) return;
+  if (!isOnline) {
+    alert("Batch delete requires an internet connection.");
+    return;
+  }
+
+  const checked = [...document.querySelectorAll(".item-check:checked")];
+  if (!checked.length) {
+    alert("Select at least one item to delete.");
+    return;
+  }
+
+  const codes = checked.map(cb => cb.dataset.code).filter(Boolean);
+  if (!confirm(
+    `Permanently delete ${codes.length} item(s) from ALL depots and ALL dates?\n\n` +
+    codes.slice(0, 10).join(", ") + (codes.length > 10 ? "…" : "") +
+    `\n\nThis cannot be undone.`
+  )) return;
+
+  try {
+    showSaveStatus("Deleting…");
+    const { data, error } = await db.rpc("delete_master_items_batch", {
+      p_username: currentUser.username,
+      p_item_codes: codes
+    });
+    if (error) throw error;
+
+    currentItems = currentItems.filter(i => !codes.includes(i.item_code));
+    await cacheInventory(activeLocation, dateKey(), currentItems);
+    renderTable();
+    updateKPIs();
+    loadCloudData();
+    alert(`Deleted ${codes.length} item(s) globally (${data || "?"} rows removed).`);
+    showSaveStatus("Batch delete complete");
+  } catch (err) {
+    console.error(err);
+    // Fallback: delete one by one
+    let ok = 0;
+    for (const code of codes) {
+      try {
+        const { error } = await db.rpc("delete_master_item", {
+          p_username: currentUser.username,
+          p_item_code: code
+        });
+        if (!error) ok++;
+      } catch {}
+    }
+    loadCloudData();
+    alert(`Batch RPC failed. Deleted ${ok}/${codes.length} via fallback.\n${err.message || err}`);
   }
 }
 </script>
