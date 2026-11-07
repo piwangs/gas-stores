@@ -126,7 +126,7 @@
           <input type="file" id="restoreInput" accept=".xlsx,.xls,.json" class="hidden">
         </label>
         <button id="resetStockBtn" type="button" class="hidden bg-rose-700 hover:bg-rose-800 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-md transition" title="Zero all stock quantities for selected date"><i class="fa-solid fa-eraser mr-1"></i>Reset Stock</button>
-        <button id="newItemBtn" type="button" class="bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-plus mr-1"></i>New Item</button>
+        <button id="newItemBtn" type="button" class="hidden bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-plus mr-1"></i>New Item</button>
       </div>
     </div>
   </header>
@@ -226,9 +226,9 @@
 
   <script>
     // Supabase Credentials
-    const SUPABASE_URL = "https://YOUR_SUPABASE_PROJECT_ID.supabase.co";
-    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const SUPABASE_URL = "https://chfpcwlpmzcyorifzpja.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZnBjd2xwbXpjeW9yaWZ6cGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwMjE5MzEsImV4cCI6MjEwOTU5NzkzMX0.73G3XXghDxrwVxbDibXemM5LB57LHUZdw4nK_Nc4lLo";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Application State
     let state = {
@@ -274,7 +274,7 @@
 
       errorDiv.classList.add('hidden');
 
-      // Emergency / Default Admin Fallback
+      // Emergency Admin Fallback
       if (usernameInput.toLowerCase() === 'admin' && passwordInput === 'admin2026') {
         state.user = { username: 'admin', role: 'Manager', location: 'Juba Depot' };
         completeLogin();
@@ -303,7 +303,6 @@
 
       } catch (err) {
         console.error("Login exception:", err);
-        // Fallback for offline mode testing
         if (usernameInput.toLowerCase() === 'admin' && passwordInput === 'admin2026') {
           state.user = { username: 'admin', role: 'Manager', location: 'Juba Depot' };
           completeLogin();
