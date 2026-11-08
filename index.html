@@ -1154,24 +1154,19 @@ async function saveItem(e) {
     if (!allLocationsList.length) await loadLocations();
 
     if (isNewItem && isManager()) {
-      // Atomic server-side create in EVERY depot (one transaction)
-      const { error } = await db.rpc('create_item_all_locations', {
-        p_username: currentUser.username,
-        p_entry_date: dateKey(),
-        p_item_code: itemCode,
-        p_description: globalFields.p_description,
-        p_category: globalFields.p_category,
-        p_unit: globalFields.p_unit,
-        p_primary_location: targetLocation,
-        p_opening: opening,
-        p_added: added,
-        p_issues: issues,
-        p_cost: basePayload.p_cost,
-        p_price: basePayload.p_price,
-        p_comments: basePayload.p_comments
+      const result = await ensureItemInAllDepots({
+        itemCode,
+        description: globalFields.p_description,
+        category: globalFields.p_category,
+        unit: globalFields.p_unit,
+        primaryLocation: targetLocation,
+        opening, added, issues,
+        cost: basePayload.p_cost,
+        price: basePayload.p_price,
+        comments: basePayload.p_comments,
+        entryDate: dateKey()
       });
-      if (error) throw error;
-      showSaveStatus("New item created in ALL depots");
+      showSaveStatus("New item created in " + (result.locations || "ALL") + " depot(s)");
     } else {
       // Existing item or Storekeeper edit
       const { error } = await db.rpc('secure_upsert_inventory', {
@@ -1319,6 +1314,65 @@ function showSaveStatus(msg = "Synced", persistent = false) {
 
 function showProgress(current, total, action) {
   showSaveStatus(`${action}: ${current} / ${total}`, true);
+}
+
+/**
+ * Ensure an item exists in EVERY depot for the given date.
+ * Tries atomic RPC first; if that fails, loops all known locations.
+ */
+async function ensureItemInAllDepots({
+  itemCode, description, category, unit,
+  primaryLocation, opening, added, issues, cost, price, comments, entryDate
+}) {
+  if (!allLocationsList.length) await loadLocations();
+
+  // Prefer single-transaction RPC
+  const { error: rpcErr } = await db.rpc("create_item_all_locations", {
+    p_username: currentUser.username,
+    p_entry_date: entryDate || dateKey(),
+    p_item_code: itemCode,
+    p_description: description,
+    p_category: category,
+    p_unit: unit,
+    p_primary_location: primaryLocation,
+    p_opening: opening || 0,
+    p_added: added || 0,
+    p_issues: issues || 0,
+    p_cost: cost || 0,
+    p_price: price || 0,
+    p_comments: comments || ""
+  });
+
+  if (!rpcErr) return { method: "rpc", locations: allLocationsList.length || "all" };
+
+  // Fallback: write to every location explicitly
+  console.warn("create_item_all_locations failed, using per-depot fallback:", rpcErr.message);
+  const locs = allLocationsList.length ? allLocationsList : [primaryLocation];
+  let written = 0;
+  const errors = [];
+
+  for (const loc of locs) {
+    const { error } = await db.rpc("secure_upsert_inventory", {
+      p_username: currentUser.username,
+      p_location: loc,
+      p_entry_date: entryDate || dateKey(),
+      p_item_code: itemCode,
+      p_description: description,
+      p_category: category,
+      p_unit: unit,
+      p_opening: (loc === primaryLocation) ? (opening || 0) : 0,
+      p_added: (loc === primaryLocation) ? (added || 0) : 0,
+      p_issues: (loc === primaryLocation) ? (issues || 0) : 0,
+      p_cost: cost || 0,
+      p_price: price || 0,
+      p_comments: comments || ""
+    });
+    if (error) errors.push(loc + ": " + error.message);
+    else written++;
+  }
+
+  if (written === 0) throw new Error(errors.join("; ") || "Failed to write to any depot");
+  return { method: "loop", locations: written, errors };
 }
 
 function filterCategory(cat) {
@@ -1903,6 +1957,13 @@ async function handleExcelUpload(e) {
   }
 
   try {
+    // Always refresh depot list before bulk create
+    await loadLocations();
+    if (!allLocationsList.length) {
+      alert("No depots found. Add depots under Depots & Users first.");
+      return;
+    }
+
     const data = await file.arrayBuffer();
     const workbook = XLSX.read(data, { type: "array" });
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -1963,40 +2024,20 @@ async function handleExcelUpload(e) {
         const isNew = !existing || existing.length === 0;
 
         if (isNew) {
-          const { error } = await db.rpc("create_item_all_locations", {
-            p_username: currentUser.username,
-            p_entry_date: dateKey(),
-            p_item_code: itemCode,
-            p_description: description,
-            p_category: category,
-            p_unit: unit,
-            p_primary_location: activeLocation,
-            p_opening: opening,
-            p_added: 0,
-            p_issues: 0,
-            p_cost: cost,
-            p_price: price,
-            p_comments: "Imported from Excel"
+          await ensureItemInAllDepots({
+            itemCode,
+            description,
+            category,
+            unit,
+            primaryLocation: activeLocation,
+            opening,
+            added: 0,
+            issues: 0,
+            cost,
+            price,
+            comments: "Imported from Excel",
+            entryDate: dateKey()
           });
-          if (error) {
-            // Fallback: create for active location only then cascade metadata
-            const { error: e2 } = await db.rpc("secure_upsert_inventory", {
-              p_username: currentUser.username,
-              p_location: activeLocation,
-              p_entry_date: dateKey(),
-              p_item_code: itemCode,
-              p_description: description,
-              p_category: category,
-              p_unit: unit,
-              p_opening: opening,
-              p_added: 0,
-              p_issues: 0,
-              p_cost: cost,
-              p_price: price,
-              p_comments: "Imported from Excel"
-            });
-            if (e2) throw e2;
-          }
         } else {
           const { error } = await db.rpc("secure_upsert_inventory", {
             p_username: currentUser.username,
