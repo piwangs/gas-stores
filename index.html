@@ -1306,13 +1306,19 @@ async function deleteItem() {
   }
 }
 
-function showSaveStatus(msg = "Synced") {
+function showSaveStatus(msg = "Synced", persistent = false) {
   const status = $("saveStatus");
   if (!status) return;
   status.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-1"></i>${msg}`;
   status.classList.remove("opacity-0");
   clearTimeout(saveStatusTimer);
-  saveStatusTimer = setTimeout(() => status.classList.add("opacity-0"), 2500);
+  if (!persistent) {
+    saveStatusTimer = setTimeout(() => status.classList.add("opacity-0"), 3000);
+  }
+}
+
+function showProgress(current, total, action) {
+  showSaveStatus(`${action}: ${current} / ${total}`, true);
 }
 
 function filterCategory(cat) {
@@ -1919,10 +1925,13 @@ async function handleExcelUpload(e) {
     let successCount = 0;
     let errorCount = 0;
     const errors = [];
+    const total = normalised.length;
 
-    showSaveStatus("Uploading… please wait");
+    // No row limit – process every row with live progress
+    for (let i = 0; i < total; i++) {
+      const row = normalised[i];
+      showProgress(i + 1, total, "Uploading");
 
-    for (const row of normalised) {
       try {
         let itemCode = String(row["item code"] || row["itemcode"] || row["id"] || "").trim();
         const description = String(row["description"] || "").trim();
@@ -1934,18 +1943,17 @@ async function handleExcelUpload(e) {
 
         if (!description) {
           errorCount++;
-          errors.push("Skipped row with empty Description");
+          errors.push("Row " + (i + 1) + ": empty Description");
           continue;
         }
 
-        // Auto-generate code if blank
+        // Auto-generate sequential code if blank (001, 002, 003…)
         if (!itemCode) {
           const { data: nextCode, error } = await db.rpc("get_next_item_code");
           if (error) throw error;
           itemCode = nextCode || "001";
         }
 
-        // Does this item already exist?
         const { data: existing } = await db
           .from("inventory_entries")
           .select("item_code")
@@ -1955,7 +1963,6 @@ async function handleExcelUpload(e) {
         const isNew = !existing || existing.length === 0;
 
         if (isNew) {
-          // Atomic create in EVERY depot
           const { error } = await db.rpc("create_item_all_locations", {
             p_username: currentUser.username,
             p_entry_date: dateKey(),
@@ -1971,9 +1978,26 @@ async function handleExcelUpload(e) {
             p_price: price,
             p_comments: "Imported from Excel"
           });
-          if (error) throw error;
+          if (error) {
+            // Fallback: create for active location only then cascade metadata
+            const { error: e2 } = await db.rpc("secure_upsert_inventory", {
+              p_username: currentUser.username,
+              p_location: activeLocation,
+              p_entry_date: dateKey(),
+              p_item_code: itemCode,
+              p_description: description,
+              p_category: category,
+              p_unit: unit,
+              p_opening: opening,
+              p_added: 0,
+              p_issues: 0,
+              p_cost: cost,
+              p_price: price,
+              p_comments: "Imported from Excel"
+            });
+            if (e2) throw e2;
+          }
         } else {
-          // Existing item → update global metadata + stock for active depot
           const { error } = await db.rpc("secure_upsert_inventory", {
             p_username: currentUser.username,
             p_location: activeLocation,
@@ -1995,19 +2019,19 @@ async function handleExcelUpload(e) {
         successCount++;
       } catch (err) {
         errorCount++;
-        errors.push(err.message || String(err));
+        errors.push("Row " + (i + 1) + ": " + (err.message || String(err)));
       }
     }
 
     loadCloudData();
 
-    let msg = `Upload finished.\n\nSuccessfully processed: ${successCount} item(s)`;
+    let msg = `✅ Upload finished.\n\nSuccessfully processed: ${successCount} / ${total}`;
     if (errorCount) {
-      msg += `\nErrors: ${errorCount}\n\n${errors.slice(0, 5).join("\n")}`;
-      if (errors.length > 5) msg += `\n… and ${errors.length - 5} more`;
+      msg += `\nErrors: ${errorCount}\n\n${errors.slice(0, 8).join("\n")}`;
+      if (errors.length > 8) msg += `\n… and ${errors.length - 8} more`;
     }
     alert(msg);
-    showSaveStatus(`${successCount} items imported`);
+    showSaveStatus(`${successCount}/${total} items imported`);
   } catch (err) {
     console.error(err);
     alert("Failed to read Excel file: " + (err.message || err));
@@ -2331,36 +2355,58 @@ async function batchDeleteSelected() {
     `\n\nThis cannot be undone.`
   )) return;
 
+  let ok = 0;
+  let failed = 0;
+
+  // Prefer batch RPC
   try {
-    showSaveStatus("Deleting…");
+    showProgress(0, codes.length, "Deleting");
     const { data, error } = await db.rpc("delete_master_items_batch", {
       p_username: currentUser.username,
       p_item_codes: codes
     });
     if (error) throw error;
 
+    ok = codes.length;
     currentItems = currentItems.filter(i => !codes.includes(i.item_code));
     await cacheInventory(activeLocation, dateKey(), currentItems);
     renderTable();
     updateKPIs();
     loadCloudData();
-    alert(`Deleted ${codes.length} item(s) globally (${data || "?"} rows removed).`);
-    showSaveStatus("Batch delete complete");
+    showSaveStatus(`Deleted ${ok} item(s) successfully`);
+    alert(`✅ Successfully deleted ${ok} item(s) from all depots.`);
+    return;
   } catch (err) {
-    console.error(err);
-    // Fallback: delete one by one
-    let ok = 0;
-    for (const code of codes) {
-      try {
-        const { error } = await db.rpc("delete_master_item", {
-          p_username: currentUser.username,
-          p_item_code: code
-        });
-        if (!error) ok++;
-      } catch {}
+    console.warn("Batch RPC unavailable, deleting one by one:", err.message || err);
+  }
+
+  // Fallback with live progress
+  for (let i = 0; i < codes.length; i++) {
+    showProgress(i + 1, codes.length, "Deleting");
+    try {
+      const { error } = await db.rpc("delete_master_item", {
+        p_username: currentUser.username,
+        p_item_code: codes[i]
+      });
+      if (error) throw error;
+      ok++;
+    } catch {
+      failed++;
     }
-    loadCloudData();
-    alert(`Batch RPC failed. Deleted ${ok}/${codes.length} via fallback.\n${err.message || err}`);
+  }
+
+  currentItems = currentItems.filter(i => !codes.includes(i.item_code));
+  await cacheInventory(activeLocation, dateKey(), currentItems);
+  renderTable();
+  updateKPIs();
+  loadCloudData();
+
+  if (failed === 0) {
+    showSaveStatus(`Deleted ${ok} item(s) successfully`);
+    alert(`✅ Successfully deleted ${ok} item(s) from all depots.`);
+  } else {
+    showSaveStatus(`Deleted ${ok}, failed ${failed}`);
+    alert(`Deleted ${ok} item(s). Failed: ${failed}.`);
   }
 }
 </script>
