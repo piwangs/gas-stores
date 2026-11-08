@@ -228,6 +228,8 @@
             <div>
               <label class="block text-xs font-semibold mb-1 text-slate-600">Item ID (Global)</label>
               <input id="itemId" required readonly class="w-full bg-slate-100 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-600" placeholder="Auto">
+              <input type="hidden" id="originalItemCode" value="">
+              <p id="itemIdHint" class="hidden text-[10px] text-amber-700 mt-1">Managers can change this ID — it updates in every depot.</p>
             </div>
             <div class="col-span-2">
               <label class="block text-xs font-semibold mb-1 text-slate-600">Description (Global)</label>
@@ -333,7 +335,11 @@
     <div class="bg-white rounded-2xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto space-y-4">
       <div class="flex justify-between items-center border-b pb-3">
         <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-clipboard-list text-emerald-600 mr-2"></i>Store Requisitions & Memo Requests</h3>
-        <button id="closeRequestX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
+        <div class="flex items-center gap-2">
+          <button id="exportReqExcelBtn" type="button" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2.5 py-1.5 rounded-lg text-xs font-semibold"><i class="fa-solid fa-file-excel mr-1"></i>Excel</button>
+          <button id="exportReqPdfBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold"><i class="fa-solid fa-file-pdf mr-1"></i>Print/PDF</button>
+          <button id="closeRequestX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
       </div>
       <form id="requestForm" class="grid sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border">
         <div class="sm:col-span-2">
@@ -691,6 +697,8 @@ function bindEvents() {
   $("restoreInput").addEventListener("change", handleInventoryRestore);
   $("resetStockBtn").addEventListener("click", resetAllStock);
   $("batchDeleteBtn").addEventListener("click", batchDeleteSelected);
+  $("exportReqExcelBtn")?.addEventListener("click", exportRequisitionsExcel);
+  $("exportReqPdfBtn")?.addEventListener("click", exportRequisitionsPdf);
   $("selectAllItems")?.addEventListener("change", (e) => {
     document.querySelectorAll(".item-check").forEach(cb => { cb.checked = e.target.checked; });
   });
@@ -987,7 +995,13 @@ function openEditItemModal(id) {
   const manager = isManager();
   $("modalTitle").textContent = manager ? `Edit Item: ${item.description}` : `Log Stock for: ${item.description}`;
   $("itemId").value = item.item_code;
-  $("itemId").readOnly = true;
+  $("originalItemCode").value = item.item_code;
+  // Managers may edit the global Item ID
+  $("itemId").readOnly = !manager;
+  $("itemId").className = manager
+    ? "w-full bg-white border border-brand-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-800"
+    : "w-full bg-slate-100 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-600";
+  $("itemIdHint").classList.toggle("hidden", !manager);
   $("itemDescription").value = item.description;
   $("itemCategory").value = item.category;
   $("itemSpec").value = item.unit;
@@ -1051,7 +1065,10 @@ async function openNewItemModal() {
 
   $("modalTitle").textContent = "Add New Master Item (appears in ALL depots)";
   $("itemId").value = nextCode;
-  $("itemId").readOnly = true;
+  $("originalItemCode").value = ""; // empty = new item
+  $("itemId").readOnly = false;
+  $("itemId").className = "w-full bg-white border border-brand-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-800";
+  $("itemIdHint").classList.remove("hidden");
   $("itemDescription").value = "";
   $("itemCategory").value = "Dry Food Items";
   $("itemSpec").value = "Kg";
@@ -1086,7 +1103,15 @@ async function saveItem(e) {
   e.preventDefault();
   const targetLocation = isManager() ? $("itemTargetLocation").value : activeLocation;
   const itemCode = $("itemId").value.trim();
-  const isNewItem = !currentItems.some(i => i.item_code === itemCode);
+  const originalCode = ($("originalItemCode").value || "").trim();
+  const codeChanged = originalCode && originalCode !== itemCode;
+  // New item if we opened "New Item" (no original) or code not in current list
+  const isNewItem = !originalCode || (!codeChanged && !currentItems.some(i => i.item_code === itemCode));
+
+  if (!itemCode) {
+    alert("Item ID is required.");
+    return;
+  }
 
   // Global master fields – these must be identical in every depot
   const globalFields = {
@@ -1152,6 +1177,18 @@ async function saveItem(e) {
   try {
     // Ensure locations list is loaded
     if (!allLocationsList.length) await loadLocations();
+
+    // Manager changed the Item ID → rename globally first
+    if (codeChanged && isManager()) {
+      showSaveStatus("Changing Item ID globally…", true);
+      const { error: renameErr } = await db.rpc("change_item_code", {
+        p_username: currentUser.username,
+        p_old_code: originalCode,
+        p_new_code: itemCode
+      });
+      if (renameErr) throw renameErr;
+      showSaveStatus("Item ID changed: " + originalCode + " → " + itemCode);
+    }
 
     if (isNewItem && isManager()) {
       const result = await ensureItemInAllDepots({
@@ -1742,14 +1779,33 @@ async function deleteLocation(name) {
 }
 
 async function loadAccountsListModal() {
-  const { data, error } = await db.rpc('list_store_users', {
+  const container = $("accountList");
+  container.replaceChildren();
+  container.innerHTML = `<div class="text-slate-500 text-xs text-center py-2">Loading accounts…</div>`;
+
+  let data = null;
+  let error = null;
+
+  const res = await db.rpc('list_store_users', {
     p_actor_username: currentUser.username
   });
-  const container = $("accountList");
+  data = res.data;
+  error = res.error;
+
+  // Fallback if RPC not deployed yet
+  if (error) {
+    console.warn("list_store_users missing, trying direct select:", error.message);
+    const fb = await db.from('store_users').select('id, username, name, role, location, disabled').order('username');
+    if (!fb.error) {
+      data = fb.data;
+      error = null;
+    }
+  }
+
   container.replaceChildren();
 
   if (error) {
-    container.innerHTML = `<div class="text-rose-600 text-xs">Could not load accounts: ${error.message}</div>`;
+    container.innerHTML = `<div class="text-rose-600 text-xs p-2">Could not load accounts: ${error.message}<br><br>Run <b>FIX_USERS_AND_REQUESTS.sql</b> in Supabase SQL Editor, then refresh.</div>`;
     return;
   }
 
@@ -2296,7 +2352,6 @@ async function resetAllStock() {
     "This cannot be undone (take a Backup first)."
   );
 
-  // Second confirm always
   if (!confirm(
     "FINAL CONFIRMATION\n\n" +
     "Zero all stock quantities for " + dateKey() +
@@ -2306,7 +2361,13 @@ async function resetAllStock() {
   }
 
   try {
-    showSaveStatus("Resetting stock…");
+    // Optimistic UI: zero current table immediately
+    currentItems = currentItems.map(i => ({
+      ...i, opening: 0, added: 0, issues: 0, comments: ""
+    }));
+    renderTable();
+    updateKPIs();
+    showSaveStatus("Resetting stock…", true);
 
     let query = db
       .from("inventory_entries")
@@ -2327,8 +2388,11 @@ async function resetAllStock() {
 
     let success = 0;
     let failed = 0;
+    const total = data.length;
 
-    for (const row of data) {
+    for (let i = 0; i < total; i++) {
+      const row = data[i];
+      showProgress(i + 1, total, "Resetting");
       try {
         const { error: upErr } = await db.rpc("secure_upsert_inventory", {
           p_username: currentUser.username,
@@ -2353,27 +2417,117 @@ async function resetAllStock() {
       }
     }
 
-    // Clear local cache for current view
-    currentItems = currentItems.map(i => ({
-      ...i,
-      opening: 0,
-      added: 0,
-      issues: 0,
-      comments: ""
-    }));
     await cacheInventory(activeLocation, dateKey(), currentItems);
+    await loadCloudData();
+    renderTable();
+    updateKPIs();
 
-    loadCloudData();
+    showSaveStatus("Stock reset to zero (" + success + " rows)");
     alert(
-      "Stock reset complete.\n\n" +
-      "Rows zeroed: " + success +
+      "✅ Stock reset complete.\n\nRows zeroed: " + success +
       (failed ? "\nFailed: " + failed : "")
     );
-    showSaveStatus("Stock reset to zero");
   } catch (err) {
     console.error(err);
     alert("Reset failed: " + (err.message || err));
+    loadCloudData();
   }
+}
+
+async function exportRequisitionsExcel() {
+  try {
+    showSaveStatus("Exporting requisitions…", true);
+    const { data, error } = await db
+      .from("store_requests")
+      .select("*")
+      .eq("location", activeLocation)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    if (!data || !data.length) {
+      alert("No requisitions to export for this depot.");
+      return;
+    }
+
+    const rows = [[
+      "Date", "Location", "Item Code", "Item Description", "Qty", "Memo", "Status", "Requested By", "Created At"
+    ]];
+    data.forEach(r => {
+      const item = currentItems.find(i => i.item_code === r.item_code);
+      rows.push([
+        r.request_date,
+        r.location,
+        r.item_code,
+        item ? item.description : "",
+        r.quantity_requested,
+        r.memo_reference,
+        r.status,
+        r.created_by,
+        r.created_at
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 28 },
+      { wch: 8 }, { wch: 30 }, { wch: 10 }, { wch: 14 }, { wch: 22 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, "Requisitions");
+    XLSX.writeFile(wb, `Requisitions_${activeLocation}_${localDateString()}.xlsx`);
+    showSaveStatus("Requisitions Excel downloaded");
+  } catch (err) {
+    alert("Export failed: " + (err.message || err));
+  }
+}
+
+function exportRequisitionsPdf() {
+  // Print-friendly view of current request list
+  const list = $("requestList");
+  if (!list || !list.innerText.trim()) {
+    alert("No requisitions loaded. Open the list first.");
+    return;
+  }
+
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Please allow pop-ups to print/PDF.");
+    return;
+  }
+
+  w.document.write(`<!DOCTYPE html><html><head><title>Requisitions – ${activeLocation}</title>
+    <style>
+      body { font-family: sans-serif; padding: 24px; color: #0f172a; }
+      h1 { font-size: 18px; margin-bottom: 4px; }
+      .meta { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { border: 1px solid #94a3b8; padding: 6px 8px; text-align: left; }
+      th { background: #e2e8f0; }
+      @media print { @page { size: A4 portrait; margin: 1.5cm; } }
+    </style></head><body>
+    <h1>GAS GENERAL STORE – Store Requisitions</h1>
+    <div class="meta">Depot: <b>${activeLocation}</b> &nbsp;|&nbsp; Printed: ${new Date().toLocaleString()} &nbsp;|&nbsp; User: ${currentUser ? currentUser.name : ""}</div>
+    <table><thead><tr>
+      <th>Item</th><th>Qty</th><th>Memo</th><th>Status</th><th>By</th>
+    </tr></thead><tbody>`);
+
+  // Rebuild from last loaded DOM entries if possible, else parse list text
+  const cards = list.querySelectorAll(":scope > div");
+  if (cards.length) {
+    cards.forEach(card => {
+      const html = card.innerHTML.replace(/"/g, "&quot;");
+      w.document.write(`<tr><td colspan="5">${card.innerText.replace(/\n/g, " | ")}</td></tr>`);
+    });
+  } else {
+    w.document.write(`<tr><td colspan="5">${list.innerText}</td></tr>`);
+  }
+
+  w.document.write(`</tbody></table>
+    <p style="margin-top:40px;font-size:11px;">Storekeeper ________________ &nbsp;&nbsp; Manager ________________ &nbsp;&nbsp; Date ________</p>
+    <script>window.onload=function(){window.print();}</script>
+    </body></html>`);
+  w.document.close();
+  showSaveStatus("Requisitions print/PDF opened");
 }
 
 async function batchDeleteSelected() {
