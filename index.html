@@ -487,7 +487,7 @@
     let selectedItemIds = new Set();
     const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 Hours offline storage window
 
-    const fallbackUsers = [
+    let systemUsers = [
       { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Admin', location: 'Juba' },
       { id: '2', username: 'manager', password: 'password123', display_name: 'Store Manager', role: 'Manager', location: 'Juba' },
       { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
@@ -820,16 +820,19 @@
       if (itemPrice) itemPrice.value = item.selling_price;
       if (itemComments) itemComments.value = item.comments || '';
 
-      // Access restriction for master data vs quantities
-      const isMasterEditable = currentUser && currentUser.role === 'Admin';
-      if (itemDescription) itemDescription.disabled = !isMasterEditable;
-      if (itemCategory) itemCategory.disabled = !isMasterEditable;
-      if (itemSpec) itemSpec.disabled = !isMasterEditable;
-      if (itemCost) itemCost.disabled = !isMasterEditable;
-      if (itemPrice) itemPrice.disabled = !isMasterEditable;
+      // Access restriction: Storekeepers are allowed to edit ONLY Added, Issues, and Comments.
+      const isStorekeeper = currentUser && currentUser.role === 'Storekeeper';
+      const isAdmin = currentUser && currentUser.role === 'Admin';
+
+      if (itemOpening) itemOpening.disabled = isStorekeeper;
+      if (itemDescription) itemDescription.disabled = !isAdmin;
+      if (itemCategory) itemCategory.disabled = !isAdmin;
+      if (itemSpec) itemSpec.disabled = !isAdmin;
+      if (itemCost) itemCost.disabled = !isAdmin;
+      if (itemPrice) itemPrice.disabled = !isAdmin;
 
       if (deleteItemBtn) {
-        if (currentUser && currentUser.role === 'Admin') deleteItemBtn.classList.remove('hidden');
+        if (isAdmin) deleteItemBtn.classList.remove('hidden');
         else deleteItemBtn.classList.add('hidden');
       }
 
@@ -841,30 +844,83 @@
     };
 
     // Modal Action Bindings & Item Creation
-    document.getElementById('newItemBtn')?.addEventListener('click', () => {
-      const modalTitle = document.getElementById('modalTitle');
-      const itemForm = document.getElementById('itemForm');
-      const originalItemCode = document.getElementById('originalItemCode');
-      const itemId = document.getElementById('itemId');
-      const deleteItemBtn = document.getElementById('deleteItemBtn');
+    function renderUserList() {
+      const userListEl = document.getElementById('userList');
+      if (!userListEl) return;
+      userListEl.innerHTML = systemUsers.map(u => `
+        <div class="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+          <div>
+            <p class="font-bold text-slate-800">${u.display_name} <span class="text-slate-400">(@${u.username})</span></p>
+            <p class="text-[10px] text-slate-500">Role: <span class="font-bold text-brand-600">${u.role}</span> | Depot: ${u.location}</p>
+          </div>
+          ${(currentUser && currentUser.role === 'Admin' && u.username !== currentUser.username) ? 
+            `<button type="button" onclick="deleteUserAccount('${u.id}')" class="text-rose-600 hover:bg-rose-50 p-1.5 rounded transition" title="Delete User"><i class="fa-solid fa-trash"></i></button>` : ''}
+        </div>
+      `).join('');
+    }
 
-      if (modalTitle) modalTitle.textContent = "Add New Inventory Item";
-      if (itemForm) itemForm.reset();
-      if (originalItemCode) originalItemCode.value = "";
-      if (itemId) itemId.value = "ITEM-" + Math.floor(1000 + Math.random() * 9000);
-      if (deleteItemBtn) deleteItemBtn.classList.add('hidden');
+    window.deleteUserAccount = async function(id) {
+      if (!confirm("Delete this user account?")) return;
+      systemUsers = systemUsers.filter(u => u.id !== id);
+      renderUserList();
+      if (isOnline && supabaseClient) {
+        await supabaseClient.from('users').delete().eq('id', id);
+      }
+      showSaveStatus("Account deleted");
+    };
 
-      const isMasterEditable = currentUser && currentUser.role === 'Manager';
-      ['itemDescription', 'itemCategory', 'itemSpec', 'itemCost', 'itemPrice'].forEach(f => {
-        const el = document.getElementById(f);
-        if (el) el.disabled = !isMasterEditable;
-      });
-
-      const modal = document.getElementById('itemModal');
+    document.getElementById('manageUsersBtn')?.addEventListener('click', () => {
+      const locList = document.getElementById('locationList');
+      if (locList) locList.innerHTML = availableDepots.map(d => `<div class="flex justify-between items-center p-2 bg-slate-50 border rounded-lg"><span class="font-bold text-xs">${d} Depot</span><span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Active</span></div>`).join('');
+      renderUserList();
+      const modal = document.getElementById('userManagerModal');
       if (modal) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
       }
+    });
+
+    document.getElementById('userForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const newUsername = document.getElementById('newUsername')?.value.trim();
+      const newDisplayName = document.getElementById('newDisplayName')?.value.trim();
+      const newPassword = document.getElementById('newPassword')?.value.trim();
+      const newUserRole = document.getElementById('newUserRole')?.value;
+      const newUserLocation = document.getElementById('newUserLocation')?.value;
+
+      if (!newUsername || !newPassword) return;
+
+      const newUser = {
+        id: "usr-" + Date.now(),
+        username: newUsername,
+        display_name: newDisplayName || newUsername,
+        password: newPassword,
+        role: newUserRole,
+        location: newUserLocation
+      };
+
+      systemUsers.push(newUser);
+      renderUserList();
+      document.getElementById('userForm')?.reset();
+
+      if (isOnline && supabaseClient) {
+        try {
+          await supabaseClient.from('users').insert([{
+            username: newUsername,
+            display_name: newDisplayName,
+            password: newPassword,
+            role: newUserRole,
+            location: newUserLocation
+          }]);
+        } catch (err) {
+          console.warn("Supabase user insert warning:", err);
+        }
+      }
+
+      showSaveStatus("New user account created!");
+      alert(`Account '${newUsername}' created successfully!`);
     });
 
     const closeItemModal = () => {
@@ -874,6 +930,43 @@
         modal.classList.remove('flex');
       }
     };
+
+    document.getElementById('newItemBtn')?.addEventListener('click', () => {
+      const modalTitle = document.getElementById('modalTitle');
+      const itemForm = document.getElementById('itemForm');
+      if (modalTitle) modalTitle.textContent = "Add New Inventory Item";
+      if (itemForm) itemForm.reset();
+      
+      const origId = document.getElementById('originalItemCode');
+      const itemId = document.getElementById('itemId');
+      if (origId) origId.value = "";
+      if (itemId) itemId.value = "ITEM-" + Math.floor(Math.random() * 9000);
+
+      const isStorekeeper = currentUser && currentUser.role === 'Storekeeper';
+      const isAdmin = currentUser && currentUser.role === 'Admin';
+      
+      const itemOpening = document.getElementById('itemOpening');
+      const itemDescription = document.getElementById('itemDescription');
+      const itemCategory = document.getElementById('itemCategory');
+      const itemSpec = document.getElementById('itemSpec');
+      const itemCost = document.getElementById('itemCost');
+      const itemPrice = document.getElementById('itemPrice');
+      const deleteItemBtn = document.getElementById('deleteItemBtn');
+
+      if (itemOpening) itemOpening.disabled = isStorekeeper;
+      if (itemDescription) itemDescription.disabled = !isAdmin;
+      if (itemCategory) itemCategory.disabled = !isAdmin;
+      if (itemSpec) itemSpec.disabled = !isAdmin;
+      if (itemCost) itemCost.disabled = !isAdmin;
+      if (itemPrice) itemPrice.disabled = !isAdmin;
+      if (deleteItemBtn) deleteItemBtn.classList.add('hidden');
+
+      const modal = document.getElementById('itemModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    });
 
     document.getElementById('closeItemX')?.addEventListener('click', closeItemModal);
     document.getElementById('cancelItemBtn')?.addEventListener('click', closeItemModal);
@@ -1243,7 +1336,7 @@
       if (errorDiv) errorDiv.classList.add('hidden');
 
       // 1. Local check for instant login verification
-      const localMatch = fallbackUsers.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
+      const localMatch = systemUsers.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
       if (localMatch) {
         loginSuccess(localMatch);
         return;
