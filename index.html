@@ -60,11 +60,11 @@
       <form id="loginForm" class="space-y-3">
         <div>
           <label for="loginUser" class="block text-xs font-semibold uppercase mb-1 text-slate-600">Username</label>
-          <input id="loginUser" required autocomplete="username" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter username">
+          <input id="loginUser" required autocomplete="username" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter username (admin, manager, storekeeper)">
         </div>
         <div>
           <label for="loginPass" class="block text-xs font-semibold uppercase mb-1 text-slate-600">Password</label>
-          <input id="loginPass" type="password" required autocomplete="current-password" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter password">
+          <input id="loginPass" type="password" required autocomplete="current-password" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter password (password123)">
         </div>
         <div id="loginError" class="hidden text-xs text-rose-600 font-semibold text-center">Invalid credentials or disabled account.</div>
         <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg text-sm shadow-md transition">Sign In</button>
@@ -171,7 +171,7 @@
     </section>
 
     <!-- Filters Panel -->
-    <section class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-3">
+    <section id="filtersPanel" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-3">
       <div class="flex flex-wrap gap-2" id="categoryFilter">
         <button data-category="All" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white">All</button>
         <button data-category="Dry Food Items" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">Dry Food</button>
@@ -242,9 +242,8 @@
           <div class="grid grid-cols-3 gap-3">
             <div>
               <label class="block text-xs font-semibold mb-1 text-slate-600">Item ID (Global)</label>
-              <input id="itemId" required readonly class="w-full bg-slate-100 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-600" placeholder="Auto">
+              <input id="itemId" required class="w-full bg-slate-50 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-700" placeholder="e.g. DRY-01">
               <input type="hidden" id="originalItemCode" value="">
-              <p id="itemIdHint" class="hidden text-[10px] text-amber-700 mt-1">Admins can change this ID — it updates in every depot.</p>
             </div>
             <div class="col-span-2">
               <label class="block text-xs font-semibold mb-1 text-slate-600">Description (Global)</label>
@@ -449,8 +448,29 @@
     let supabaseClient = null;
     let isOnline = navigator.onLine;
 
-    // Default depots list
+    // Top-Level Application State (Declared first to avoid initialization temporal dead zone errors)
     let availableDepots = ["Juba", "Tomping", "UNHOUSE", "WAU", "YAMBIO", "Bentiu"];
+    let offlineQueue = [];
+    let currentUser = null;
+    let currentStoreLocation = "Juba";
+    let inventoryItems = [];
+    let selectedItemIds = new Set();
+    const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 Hours offline storage window
+
+    let systemUsers = [
+      { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Admin', location: 'Juba' },
+      { id: '2', username: 'manager', password: 'password123', display_name: 'Store Manager', role: 'Manager', location: 'Juba' },
+      { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
+    ];
+
+    // Master catalog repository (shared across all depots)
+    let masterCatalog = [
+      { item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', cost_price: 18.00, selling_price: 24.00 },
+      { item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', cost_price: 9.50, selling_price: 12.50 },
+      { item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', cost_price: 12.00, selling_price: 18.00 }
+    ];
+
+    let initializedDepots = new Set();
 
     function updateNetworkStatus() {
       isOnline = navigator.onLine;
@@ -483,251 +503,683 @@
 
     initSupabase();
 
-    let currentUser = null;
-    let currentStoreLocation = "Juba";
-    let inventoryItems = [];
-    let selectedItemIds = new Set();
-    const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 Hours offline storage window
-
-    let systemUsers = [
-      { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Admin', location: 'Juba' },
-      { id: '2', username: 'manager', password: 'password123', display_name: 'Store Manager', role: 'Manager', location: 'Juba' },
-      { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
-    ];
-
-    // Master catalog repository (shared across all depots)
-    let masterCatalog = [
-      { item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', cost_price: 18.00, selling_price: 24.00 },
-      { item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', cost_price: 9.50, selling_price: 12.50 },
-      { item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', cost_price: 12.00, selling_price: 18.00 }
-    ];
-
-    // Default seed items derived clean from master catalog
-    const sampleItems = masterCatalog.map(m => ({
-      id: `item-Juba-${m.item_code}-default`,
-      item_code: m.item_code,
-      description: m.description,
-      category: m.category,
-      unit: m.unit,
-      opening: 0,
-      added: 0,
-      issues: 0,
-      cost_price: m.cost_price,
-      selling_price: m.selling_price,
-      location: 'Juba',
-      comments: '',
-      updated_at: new Date().toISOString()
-    }));
-
     // Cache management using idb-keyval
     async function getCachedInventory(location, dateStr) {
       try {
-        if (typeof idbKeyval !== 'undefined') {
-          const key = `inventory_${location}_${dateStr}`;
-          const cacheObj = await idbKeyval.get(key);
-          if (cacheObj && (Date.now() - cacheObj.timestamp < CACHE_TTL_MS)) {
-            return cacheObj.data;
+        if (window.idbKeyval) {
+          const cached = await window.idbKeyval.get(`inv_${location}_${dateStr}`);
+          if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+            return cached.data;
           }
         }
-      } catch (e) { console.warn("Cache load error:", e); }
+      } catch (e) {
+        console.warn("IDB read error:", e);
+      }
       return null;
     }
 
     async function setCachedInventory(location, dateStr, data) {
       try {
-        if (typeof idbKeyval !== 'undefined') {
-          const key = `inventory_${location}_${dateStr}`;
-          await idbKeyval.set(key, { timestamp: Date.now(), data });
+        if (window.idbKeyval) {
+          await window.idbKeyval.set(`inv_${location}_${dateStr}`, {
+            timestamp: Date.now(),
+            data: data
+          });
         }
-      } catch (e) { console.warn("Cache save error:", e); }
-    }
-
-    async function queueOfflineChange(action, payload) {
-      try {
-        if (typeof idbKeyval !== 'undefined') {
-          const queue = (await idbKeyval.get('offline_sync_queue')) || [];
-          queue.push({ action, payload, timestamp: Date.now() });
-          await idbKeyval.set('offline_sync_queue', queue);
-        }
-      } catch (e) { console.warn("Offline queue error:", e); }
+      } catch (e) {
+        console.warn("IDB write error:", e);
+      }
     }
 
     async function syncOfflineQueue() {
-      if (!isOnline || !supabaseClient || typeof idbKeyval === 'undefined') return;
-      try {
-        const queue = (await idbKeyval.get('offline_sync_queue')) || [];
-        if (queue.length === 0) return;
-
-        showSaveStatus("Syncing offline changes...");
-        for (const item of queue) {
-          if (item.action === 'upsert') {
-            await supabaseClient.from('inventory').upsert(item.payload);
-          } else if (item.action === 'delete') {
-            await supabaseClient.from('inventory').delete().in('id', item.payload);
+      if (!isOnline || !supabaseClient || offlineQueue.length === 0) return;
+      showSaveStatus("Syncing offline changes...");
+      const queueCopy = [...offlineQueue];
+      offlineQueue = [];
+      for (const task of queueCopy) {
+        try {
+          if (task.type === 'upsert') {
+            await supabaseClient.from('inventory').upsert(task.payload);
+          } else if (task.type === 'delete') {
+            await supabaseClient.from('inventory').delete().eq('id', task.id);
           }
+        } catch (e) {
+          console.error("Queue sync error:", e);
+          offlineQueue.push(task);
         }
-        await idbKeyval.set('offline_sync_queue', []);
-        showSaveStatus("Offline queue synced!");
-      } catch (e) { console.warn("Sync queue failed:", e); }
+      }
+      showSaveStatus("Synced with Cloud");
     }
 
-    function showSaveStatus(msg = "Synced") {
+    function showSaveStatus(msg = "Saved locally") {
       const el = document.getElementById('saveStatus');
       if (el) {
         el.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-1"></i>${msg}`;
-        el.classList.remove('opacity-0');
-        setTimeout(() => el.classList.add('opacity-0'), 2500);
+        el.style.opacity = '1';
+        setTimeout(() => { el.style.opacity = '0'; }, 2500);
       }
     }
 
-    // Populate Depot dropdowns
-    function renderDepotDropdowns() {
-      const locSelect = document.getElementById('locationSelector');
-      const itemLocSelect = document.getElementById('itemTargetLocation');
-      const transferFrom = document.getElementById('transferFromLoc');
-      const transferTo = document.getElementById('transferToLoc');
-      const newUserLoc = document.getElementById('newUserLocation');
+    // Dynamic Date Handling
+    function getSelectedDateStr() {
+      const input = document.getElementById('selectedDate');
+      if (input && input.value) return input.value;
+      const today = new Date().toISOString().split('T')[0];
+      if (input) input.value = today;
+      return today;
+    }
 
-      if (locSelect) locSelect.innerHTML = availableDepots.map(d => `<option value="${d}" ${d===currentStoreLocation?'selected':''}>${d} Depot</option>`).join('');
-      if (itemLocSelect) itemLocSelect.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
-      if (transferFrom) transferFrom.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
-      if (transferTo) transferTo.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
-      if (newUserLoc) newUserLoc.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+    function updateDayLabel(dateStr) {
+      const dateObj = new Date(dateStr + 'T00:00:00');
+      const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+      const el = document.getElementById('dayLabel');
+      if (el) el.textContent = dayName;
       
-      renderDepotManagerList();
+      const printDate = document.getElementById('printDateValue');
+      if (printDate) printDate.textContent = dayName;
     }
 
-    function renderDepotManagerList() {
-      const locList = document.getElementById('locationList');
-      if (!locList) return;
-      locList.innerHTML = availableDepots.map(d => `
-        <div class="flex justify-between items-center p-2 bg-slate-50 border border-slate-200 rounded-lg">
-          <span class="font-bold text-xs text-slate-800"><i class="fa-solid fa-warehouse text-brand-600 mr-1.5"></i>${d} Depot</span>
-          <div class="flex items-center gap-2">
-            <span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Active</span>
-            ${(currentUser?.role === 'Admin' && availableDepots.length > 1) ? 
-              `<button type="button" onclick="deleteDepot('${d}')" class="text-rose-600 hover:bg-rose-50 px-2 py-1 rounded text-xs transition" title="Delete Depot"><i class="fa-solid fa-trash"></i></button>` : ''}
-          </div>
-        </div>
-      `).join('');
-    }
+    // Role-Based UI Access Control
+    function applyUserPermissions() {
+      if (!currentUser) return;
 
-    window.deleteDepot = function(depotName) {
-      if (!confirm(`Are you sure you want to delete '${depotName} Depot'?`)) return;
-      const isAssigned = systemUsers.some(u => u.location === depotName);
-      if (isAssigned) {
-        alert(`Cannot delete '${depotName} Depot' because user accounts are assigned to it.`);
-        return;
-      }
-      availableDepots = availableDepots.filter(d => d !== depotName);
-      renderDepotDropdowns();
-      showSaveStatus(`Deleted ${depotName} Depot`);
-    };
+      document.getElementById('displayUserName').textContent = `${currentUser.display_name} (${currentUser.role})`;
+      document.getElementById('locationBadge').textContent = currentStoreLocation;
+      document.getElementById('printLocationName').textContent = `${currentStoreLocation} Depot`;
+      document.getElementById('printUserName').textContent = currentUser.display_name;
 
-    document.getElementById('locationForm')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const input = document.getElementById('newLocationName');
-      const name = input ? input.value.trim() : '';
-      if (!name) return;
-      if (availableDepots.some(d => d.toLowerCase() === name.toLowerCase())) {
-        alert("A depot with this name already exists.");
-        return;
-      }
-      availableDepots.push(name);
-      input.value = '';
-      renderDepotDropdowns();
-      showSaveStatus(`Added ${name} Depot`);
-    });
+      const isAdmin = currentUser.role === 'Admin';
+      const isManager = currentUser.role === 'Manager' || isAdmin;
 
-    // Global Master Data Sync Function Across Depots and Dates
-    async function propagateGlobalMasterDataSync(itemCode, updatedMaster) {
-      // 0. Update or insert into global master catalog memory repository
-      const existingMasterIdx = masterCatalog.findIndex(m => m.item_code === itemCode);
-      const masterObj = {
-        item_code: itemCode,
-        description: updatedMaster.description,
-        category: updatedMaster.category,
-        unit: updatedMaster.unit,
-        cost_price: updatedMaster.cost_price,
-        selling_price: updatedMaster.selling_price
+      // Show/Hide role specific buttons
+      const toggleEl = (id, show) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('hidden', !show);
       };
-      if (existingMasterIdx !== -1) {
-        masterCatalog[existingMasterIdx] = masterObj;
-      } else {
-        masterCatalog.push(masterObj);
+
+      toggleEl('newItemBtn', isAdmin);
+      toggleEl('transferBtn', isManager);
+      toggleEl('auditReportBtn', isManager);
+      toggleEl('manageUsersBtn', isAdmin);
+      toggleEl('downloadTemplateBtn', isAdmin);
+      toggleEl('uploadExcelLabel', isAdmin);
+      toggleEl('backupBtn', isAdmin);
+      toggleEl('restoreLabel', isAdmin);
+      toggleEl('resetStockBtn', isAdmin);
+
+      const locBox = document.getElementById('managerLocationBox');
+      if (locBox) {
+        locBox.style.display = isManager ? 'flex' : 'none';
+      }
+    }
+
+    // Inventory Loading & Rendering
+    async function loadInventory() {
+      const dateStr = getSelectedDateStr();
+      updateDayLabel(dateStr);
+      
+      let fetched = null;
+      if (isOnline && supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient
+            .from('inventory')
+            .select('*')
+            .eq('location', currentStoreLocation)
+            .eq('record_date', dateStr);
+          if (!error && data) {
+            fetched = data;
+          }
+        } catch (e) {
+          console.warn("Supabase fetch error, using local cache", e);
+        }
       }
 
-      // 1. Update matching master catalog items in active dataset memory across all loaded/cached items
+      if (!fetched) {
+        fetched = await getCachedInventory(currentStoreLocation, dateStr);
+      }
+
+      const key = `${currentStoreLocation}_${dateStr}`;
+      if (!fetched || fetched.length === 0) {
+        if (!initializedDepots.has(key)) {
+          // Initialize from Master Catalog on first run
+          fetched = masterCatalog.map(m => ({
+            id: `item-${currentStoreLocation}-${m.item_code}-${dateStr}`,
+            location: currentStoreLocation,
+            record_date: dateStr,
+            item_code: m.item_code,
+            description: m.description,
+            category: m.category,
+            unit: m.unit,
+            opening: 0,
+            added: 0,
+            issues: 0,
+            cost_price: m.cost_price,
+            selling_price: m.selling_price,
+            comments: ''
+          }));
+          initializedDepots.add(key);
+        } else {
+          fetched = [];
+        }
+      }
+
+      inventoryItems = fetched;
+      await setCachedInventory(currentStoreLocation, dateStr, inventoryItems);
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      const emptyState = document.getElementById('emptyState');
+      const searchVal = (document.getElementById('searchInput')?.value || '').toLowerCase();
+      const activeCat = document.querySelector('.cat-btn.bg-brand-600')?.dataset.category || 'All';
+
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+      selectedItemIds.clear();
+      updateBatchDeleteUI();
+
+      let filtered = inventoryItems.filter(item => {
+        const matchesCat = activeCat === 'All' || item.category === activeCat;
+        const matchesSearch = item.description.toLowerCase().includes(searchVal) || item.item_code.toLowerCase().includes(searchVal);
+        return matchesCat && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        emptyState?.classList.remove('hidden');
+        updateKPIs([]);
+        return;
+      }
+
+      emptyState?.classList.add('hidden');
+
+      let totalIssues = 0;
+      let totalRevenue = 0;
+      let lowStockCount = 0;
+
+      const isStorekeeper = currentUser?.role === 'Storekeeper';
+      const isAdmin = currentUser?.role === 'Admin';
+
+      filtered.forEach(item => {
+        const opening = Number(item.opening) || 0;
+        const added = Number(item.added) || 0;
+        const issues = Number(item.issues) || 0;
+        const closing = opening + added - issues;
+        const costPrice = Number(item.cost_price) || 0;
+        const salePrice = Number(item.selling_price) || 0;
+        const estRevenue = issues * salePrice;
+
+        totalIssues += issues;
+        totalRevenue += estRevenue;
+        if (closing <= 5) lowStockCount++;
+
+        const tr = document.createElement('tr');
+        tr.className = closing <= 5 ? 'bg-rose-50/50 hover:bg-rose-100/50' : 'hover:bg-slate-50';
+
+        tr.innerHTML = `
+          <td class="p-3 text-center"><input type="checkbox" class="item-select-checkbox rounded" data-id="${item.id}"></td>
+          <td class="p-3 font-mono font-bold text-slate-600">${item.item_code}</td>
+          <td class="p-3 font-semibold text-slate-800">${item.description}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">${item.category}</span></td>
+          <td class="p-3 text-center font-semibold text-slate-600">${item.unit}</td>
+          <td class="p-3 text-center">
+            <input type="number" step="any" min="0" value="${opening}" ${isStorekeeper ? 'disabled' : ''} 
+                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500" 
+                   onchange="updateInlineQty('${item.id}', 'opening', this.value)">
+          </td>
+          <td class="p-3 text-center">
+            <input type="number" step="any" min="0" value="${added}" 
+                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500" 
+                   onchange="updateInlineQty('${item.id}', 'added', this.value)">
+          </td>
+          <td class="p-3 text-center">
+            <input type="number" step="any" min="0" value="${issues}" 
+                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500" 
+                   onchange="updateInlineQty('${item.id}', 'issues', this.value)">
+          </td>
+          <td class="p-3 text-center font-bold ${closing <= 5 ? 'text-rose-600' : 'text-slate-800'}">${closing}</td>
+          <td class="p-3 text-right font-mono text-slate-600">$${costPrice.toFixed(2)}</td>
+          <td class="p-3 text-right font-mono text-slate-800">$${salePrice.toFixed(2)}</td>
+          <td class="p-3 text-right font-mono font-bold text-emerald-600">$${estRevenue.toFixed(2)}</td>
+          <td class="p-3">
+            <input type="text" value="${item.comments || ''}" 
+                   class="w-full bg-slate-50 border border-slate-200 rounded p-1 text-xs focus:ring-1 focus:ring-brand-500" 
+                   placeholder="Notes..." onchange="updateInlineQty('${item.id}', 'comments', this.value)">
+          </td>
+          <td class="p-3 text-center">
+            <button onclick="editItemModal('${item.id}')" class="text-brand-600 hover:text-brand-800 font-semibold p-1" title="Edit Master Data"><i class="fa-solid fa-pen-to-square"></i></button>
+            ${isAdmin ? `<button onclick="deleteSingleItem('${item.id}')" class="text-rose-600 hover:text-rose-800 font-semibold p-1 ml-1" title="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Bind selection checkboxes
+      document.querySelectorAll('.item-select-checkbox').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const id = e.target.dataset.id;
+          if (e.target.checked) selectedItemIds.add(id);
+          else selectedItemIds.delete(id);
+          updateBatchDeleteUI();
+        });
+      });
+
+      updateKPIs(filtered, totalIssues, totalRevenue, lowStockCount);
+    }
+
+    function updateKPIs(items, issues = 0, revenue = 0, lowStock = 0) {
+      document.getElementById('statTotalItems').textContent = items.length;
+      document.getElementById('statTotalIssues').textContent = issues;
+      document.getElementById('statDailyRevenue').textContent = `$${revenue.toFixed(2)}`;
+      document.getElementById('statLowStock').textContent = lowStock;
+    }
+
+    async function updateInlineQty(id, field, value) {
+      const item = inventoryItems.find(i => i.id === id);
+      if (!item) return;
+
+      if (field === 'comments') {
+        item.comments = value;
+      } else {
+        item[field] = Number(value) || 0;
+      }
+
+      const dateStr = getSelectedDateStr();
+      await setCachedInventory(currentStoreLocation, dateStr, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        try {
+          await supabaseClient.from('inventory').upsert(item);
+          showSaveStatus("Synced to Cloud");
+        } catch (e) {
+          offlineQueue.push({ type: 'upsert', payload: item });
+          showSaveStatus("Queued Offline");
+        }
+      } else {
+        offlineQueue.push({ type: 'upsert', payload: item });
+        showSaveStatus("Saved Locally (Offline)");
+      }
+      renderTable();
+    }
+
+    // Global Master Sync Implementation
+    async function propagateGlobalMasterData(masterData) {
+      // 1. Update local master catalog
+      const existingMaster = masterCatalog.find(m => m.item_code === masterData.item_code);
+      if (existingMaster) {
+        Object.assign(existingMaster, masterData);
+      } else {
+        masterCatalog.push(masterData);
+      }
+
+      // 2. Update active inventory items in memory
       inventoryItems.forEach(item => {
-        if (item.item_code === itemCode) {
-          item.description = updatedMaster.description;
-          item.category = updatedMaster.category;
-          item.unit = updatedMaster.unit;
-          item.cost_price = updatedMaster.cost_price;
-          item.selling_price = updatedMaster.selling_price;
+        if (item.item_code === masterData.item_code) {
+          item.description = masterData.description;
+          item.category = masterData.category;
+          item.unit = masterData.unit;
+          item.cost_price = masterData.cost_price;
+          item.selling_price = masterData.selling_price;
         }
       });
 
-      // 2. Clear out date-specific local caches so other depots load the updated master catalog
-      try {
-        if (typeof idbKeyval !== 'undefined') {
-          for (const d of availableDepots) {
-            const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-            const key = `inventory_${d}_${selectedDate}`;
-            await idbKeyval.del(key);
-          }
-        }
-      } catch (e) {
-        console.warn("Cache clearance warning:", e);
-      }
+      const dateStr = getSelectedDateStr();
+      await setCachedInventory(currentStoreLocation, dateStr, inventoryItems);
 
-      // 3. Update Supabase Cloud DB globally across ALL depots & dates for this item_code
+      // 3. Supabase Cloud Sync across all depots for this item code
       if (isOnline && supabaseClient) {
         try {
-          const updatePayload = {
-            description: updatedMaster.description,
-            category: updatedMaster.category,
-            unit: updatedMaster.unit,
-            cost_price: updatedMaster.cost_price,
-            selling_price: updatedMaster.selling_price
-          };
-          
           await supabaseClient
             .from('inventory')
-            .update(updatePayload)
-            .eq('item_code', itemCode);
-            
-          showSaveStatus("Global Master Data Synced Across All Depots");
-        } catch (err) {
-          console.warn("Global master sync warning:", err);
+            .update({
+              description: masterData.description,
+              category: masterData.category,
+              unit: masterData.unit,
+              cost_price: masterData.cost_price,
+              selling_price: masterData.selling_price
+            })
+            .eq('item_code', masterData.item_code);
+          showSaveStatus("Master Synced Globally");
+        } catch (e) {
+          console.warn("Global cloud master sync failed:", e);
         }
       }
     }
 
-    // Account Management & Credentials Editing
-    function renderUserList() {
-      const userListEl = document.getElementById('userList');
-      if (!userListEl) return;
-      userListEl.innerHTML = systemUsers.map(u => `
-        <div class="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-          <div>
-            <p class="font-bold text-slate-800">${u.display_name} <span class="text-slate-400">(@${u.username})</span></p>
-            <p class="text-[10px] text-slate-500">Role: <span class="font-bold text-brand-600">${u.role}</span> | Depot: ${u.location}</p>
-          </div>
-          <div class="flex items-center gap-1">
-            ${(currentUser && currentUser.role === 'Admin') ? `
-              <button type="button" onclick="editUserAccount('${u.id}')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition" title="Edit User"><i class="fa-solid fa-pen-to-square"></i></button>
-              ${u.username !== currentUser.username ? `<button type="button" onclick="deleteUserAccount('${u.id}')" class="text-rose-600 hover:bg-rose-50 p-1.5 rounded transition" title="Delete User"><i class="fa-solid fa-trash"></i></button>` : ''}
-            ` : ''}
-          </div>
-        </div>
-      `).join('');
+    // Batch Delete UI Logic
+    function updateBatchDeleteUI() {
+      const btn = document.getElementById('batchDeleteBtn');
+      const countEl = document.getElementById('selectedCount');
+      if (btn && countEl) {
+        countEl.textContent = selectedItemIds.size;
+        btn.classList.toggle('hidden', selectedItemIds.size === 0);
+      }
     }
 
-    window.editUserAccount = function(id) {
-      const u = systemUsers.find(usr => usr.id === id);
+    document.getElementById('selectAllItems')?.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      document.querySelectorAll('.item-select-checkbox').forEach(cb => {
+        cb.checked = isChecked;
+        const id = cb.dataset.id;
+        if (isChecked) selectedItemIds.add(id);
+        else selectedItemIds.delete(id);
+      });
+      updateBatchDeleteUI();
+    });
+
+    document.getElementById('batchDeleteBtn')?.addEventListener('click', async () => {
+      if (selectedItemIds.size === 0) return;
+      if (!confirm(`Are you sure you want to delete ${selectedItemIds.size} selected item(s)?`)) return;
+
+      const dateStr = getSelectedDateStr();
+      const idsToDelete = Array.from(selectedItemIds);
+
+      inventoryItems = inventoryItems.filter(i => !idsToDelete.includes(i.id));
+      await setCachedInventory(currentStoreLocation, dateStr, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        for (const id of idsToDelete) {
+          try {
+            await supabaseClient.from('inventory').delete().eq('id', id);
+          } catch (e) {
+            offlineQueue.push({ type: 'delete', id });
+          }
+        }
+      } else {
+        idsToDelete.forEach(id => offlineQueue.push({ type: 'delete', id }));
+      }
+
+      selectedItemIds.clear();
+      renderTable();
+      showSaveStatus("Batch Deleted");
+    });
+
+    async function deleteSingleItem(id) {
+      if (!confirm("Are you sure you want to delete this inventory item?")) return;
+      const dateStr = getSelectedDateStr();
+      inventoryItems = inventoryItems.filter(i => i.id !== id);
+      await setCachedInventory(currentStoreLocation, dateStr, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        try {
+          await supabaseClient.from('inventory').delete().eq('id', id);
+        } catch (e) {
+          offlineQueue.push({ type: 'delete', id });
+        }
+      } else {
+        offlineQueue.push({ type: 'delete', id });
+      }
+      renderTable();
+      showSaveStatus("Item Deleted");
+    }
+
+    // Modal Control Functions
+    function editItemModal(id) {
+      const item = inventoryItems.find(i => i.id === id);
+      if (!item) return;
+
+      const modal = document.getElementById('itemModal');
+      const form = document.getElementById('itemForm');
+      if (!modal || !form) return;
+
+      document.getElementById('modalTitle').textContent = `Edit Master Details: ${item.item_code}`;
+      document.getElementById('itemId').value = item.item_code;
+      document.getElementById('originalItemCode').value = item.item_code;
+      document.getElementById('itemDescription').value = item.description;
+      document.getElementById('itemCategory').value = item.category;
+      document.getElementById('itemSpec').value = item.unit;
+      document.getElementById('itemOpening').value = item.opening;
+      document.getElementById('itemAdded').value = item.added;
+      document.getElementById('itemIssues').value = item.issues;
+      document.getElementById('itemCost').value = item.cost_price;
+      document.getElementById('itemPrice').value = item.selling_price;
+      document.getElementById('itemComments').value = item.comments || '';
+
+      const targetLoc = document.getElementById('itemTargetLocation');
+      if (targetLoc) {
+        targetLoc.innerHTML = availableDepots.map(d => `<option value="${d}" ${d === currentStoreLocation ? 'selected' : ''}>${d} Depot</option>`).join('');
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    document.getElementById('newItemBtn')?.addEventListener('click', () => {
+      const modal = document.getElementById('itemModal');
+      const form = document.getElementById('itemForm');
+      if (!modal || !form) return;
+
+      form.reset();
+      document.getElementById('modalTitle').textContent = 'Create New Global Inventory Item';
+      document.getElementById('itemId').value = `ITEM-${Math.floor(1000 + Math.random() * 9000)}`;
+      document.getElementById('originalItemCode').value = '';
+
+      const targetLoc = document.getElementById('itemTargetLocation');
+      if (targetLoc) {
+        targetLoc.innerHTML = availableDepots.map(d => `<option value="${d}" ${d === currentStoreLocation ? 'selected' : ''}>${d} Depot</option>`).join('');
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    });
+
+    document.getElementById('closeItemX')?.addEventListener('click', closeItemModal);
+    document.getElementById('cancelItemBtn')?.addEventListener('click', closeItemModal);
+
+    function closeItemModal() {
+      const modal = document.getElementById('itemModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const dateStr = getSelectedDateStr();
+
+      const itemCode = document.getElementById('itemId').value.trim();
+      const desc = document.getElementById('itemDescription').value.trim();
+      const cat = document.getElementById('itemCategory').value;
+      const unit = document.getElementById('itemSpec').value.trim();
+      const opening = Number(document.getElementById('itemOpening').value) || 0;
+      const added = Number(document.getElementById('itemAdded').value) || 0;
+      const issues = Number(document.getElementById('itemIssues').value) || 0;
+      const cost = Number(document.getElementById('itemCost').value) || 0;
+      const price = Number(document.getElementById('itemPrice').value) || 0;
+      const comments = document.getElementById('itemComments').value.trim();
+
+      const masterObj = {
+        item_code: itemCode,
+        description: desc,
+        category: cat,
+        unit: unit,
+        cost_price: cost,
+        selling_price: price
+      };
+
+      await propagateGlobalMasterData(masterObj);
+
+      // Save/Update item for current depot/date
+      let item = inventoryItems.find(i => i.item_code === itemCode);
+      if (!item) {
+        item = {
+          id: `item-${currentStoreLocation}-${itemCode}-${dateStr}`,
+          location: currentStoreLocation,
+          record_date: dateStr,
+          item_code: itemCode,
+          description: desc,
+          category: cat,
+          unit: unit,
+          opening: opening,
+          added: added,
+          issues: issues,
+          cost_price: cost,
+          selling_price: price,
+          comments: comments
+        };
+        inventoryItems.push(item);
+      } else {
+        item.opening = opening;
+        item.added = added;
+        item.issues = issues;
+        item.comments = comments;
+      }
+
+      await setCachedInventory(currentStoreLocation, dateStr, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        try {
+          await supabaseClient.from('inventory').upsert(item);
+        } catch (err) {
+          offlineQueue.push({ type: 'upsert', payload: item });
+        }
+      } else {
+        offlineQueue.push({ type: 'upsert', payload: item });
+      }
+
+      closeItemModal();
+      renderTable();
+      showSaveStatus("Saved & Global Sync Triggered");
+    });
+
+    // Account & Depot Manager Logic
+    document.getElementById('manageUsersBtn')?.addEventListener('click', () => {
+      renderUserAndDepotModal();
+      const modal = document.getElementById('userManagerModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    });
+
+    document.getElementById('closeUsersX')?.addEventListener('click', () => {
+      const modal = document.getElementById('userManagerModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    });
+
+    function renderUserAndDepotModal() {
+      // Depots List
+      const locList = document.getElementById('locationList');
+      if (locList) {
+        locList.innerHTML = availableDepots.map(dep => `
+          <div class="flex justify-between items-center bg-slate-50 p-2 rounded border text-xs">
+            <span class="font-bold text-slate-700"><i class="fa-solid fa-store text-brand-600 mr-2"></i>${dep} Depot</span>
+            ${availableDepots.length > 1 ? `<button onclick="deleteDepot('${dep}')" class="text-rose-600 hover:text-rose-800 font-bold"><i class="fa-solid fa-trash"></i></button>` : ''}
+          </div>
+        `).join('');
+      }
+
+      // Populate Location dropdowns in forms
+      const newUserLocSelect = document.getElementById('newUserLocation');
+      if (newUserLocSelect) {
+        newUserLocSelect.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+      }
+
+      // Accounts List
+      const userList = document.getElementById('userList');
+      if (userList) {
+        userList.innerHTML = systemUsers.map(u => `
+          <div class="flex justify-between items-center bg-slate-50 p-2 rounded border">
+            <div>
+              <span class="font-bold text-slate-800">${u.display_name} (@${u.username})</span>
+              <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold ${u.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${u.role}</span>
+              <span class="ml-1 text-slate-500">• ${u.location}</span>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="editUserAccount('${u.id}')" class="text-brand-600 hover:text-brand-800 font-semibold"><i class="fa-solid fa-pen-to-square"></i></button>
+              ${systemUsers.length > 1 ? `<button onclick="deleteUserAccount('${u.id}')" class="text-rose-600 hover:text-rose-800 font-semibold"><i class="fa-solid fa-trash"></i></button>` : ''}
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    document.getElementById('locationForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('newLocationName');
+      const val = input.value.trim();
+      if (val && !availableDepots.includes(val)) {
+        availableDepots.push(val);
+        input.value = '';
+        
+        // Update selector
+        const sel = document.getElementById('locationSelector');
+        if (sel) {
+          sel.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+          sel.value = currentStoreLocation;
+        }
+        renderUserAndDepotModal();
+      }
+    });
+
+    function deleteDepot(depotName) {
+      if (availableDepots.length <= 1) {
+        alert("Cannot delete the only remaining depot.");
+        return;
+      }
+      if (confirm(`Delete ${depotName} depot node?`)) {
+        availableDepots = availableDepots.filter(d => d !== depotName);
+        if (currentStoreLocation === depotName) currentStoreLocation = availableDepots[0];
+        
+        const sel = document.getElementById('locationSelector');
+        if (sel) {
+          sel.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+          sel.value = currentStoreLocation;
+        }
+        renderUserAndDepotModal();
+        loadInventory();
+      }
+    }
+
+    document.getElementById('userForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const editId = document.getElementById('editingUserId').value;
+      const username = document.getElementById('newUsername').value.trim();
+      const displayName = document.getElementById('newDisplayName').value.trim();
+      const password = document.getElementById('newPassword').value.trim();
+      const role = document.getElementById('newUserRole').value;
+      const location = document.getElementById('newUserLocation').value;
+
+      if (editId) {
+        const u = systemUsers.find(user => user.id === editId);
+        if (u) {
+          u.username = username;
+          u.display_name = displayName;
+          if (password) u.password = password;
+          u.role = role;
+          u.location = location;
+        }
+      } else {
+        systemUsers.push({
+          id: String(Date.now()),
+          username,
+          password,
+          display_name: displayName,
+          role,
+          location
+        });
+      }
+
+      document.getElementById('userForm').reset();
+      document.getElementById('editingUserId').value = '';
+      document.getElementById('userFormTitle').textContent = 'Create Account';
+      document.getElementById('saveUserBtn').textContent = 'Create Account';
+      document.getElementById('cancelEditUserBtn').classList.add('hidden');
+
+      renderUserAndDepotModal();
+    });
+
+    function editUserAccount(id) {
+      const u = systemUsers.find(user => user.id === id);
       if (!u) return;
+
       document.getElementById('editingUserId').value = u.id;
       document.getElementById('newUsername').value = u.username;
       document.getElementById('newDisplayName').value = u.display_name;
@@ -735,827 +1187,153 @@
       document.getElementById('newUserRole').value = u.role;
       document.getElementById('newUserLocation').value = u.location;
 
-      document.getElementById('userFormTitle').textContent = "Edit User Account (@" + u.username + ")";
-      document.getElementById('saveUserBtn').textContent = "Update Credentials";
+      document.getElementById('userFormTitle').textContent = `Edit Account: ${u.username}`;
+      document.getElementById('saveUserBtn').textContent = 'Update Account';
       document.getElementById('cancelEditUserBtn').classList.remove('hidden');
-    };
-
-    window.deleteUserAccount = async function(id) {
-      if (!confirm("Delete this user account?")) return;
-      systemUsers = systemUsers.filter(u => u.id !== id);
-      renderUserList();
-      if (isOnline && supabaseClient) {
-        await supabaseClient.from('users').delete().eq('id', id);
-      }
-      showSaveStatus("Account deleted");
-    };
+    }
 
     document.getElementById('cancelEditUserBtn')?.addEventListener('click', () => {
-      document.getElementById('userForm')?.reset();
-      document.getElementById('editingUserId').value = "";
-      document.getElementById('userFormTitle').textContent = "Create Account";
-      document.getElementById('saveUserBtn').textContent = "Create Account";
+      document.getElementById('userForm').reset();
+      document.getElementById('editingUserId').value = '';
+      document.getElementById('userFormTitle').textContent = 'Create Account';
+      document.getElementById('saveUserBtn').textContent = 'Create Account';
       document.getElementById('cancelEditUserBtn').classList.add('hidden');
     });
 
-    document.getElementById('userForm')?.addEventListener('submit', async (e) => {
+    function deleteUserAccount(id) {
+      if (confirm("Delete this user account?")) {
+        systemUsers = systemUsers.filter(u => u.id !== id);
+        renderUserAndDepotModal();
+      }
+    }
+
+    // Login & Session Authentication
+    document.getElementById('loginForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
-      e.stopPropagation();
-
-      const editingId = document.getElementById('editingUserId')?.value;
-      const newUsername = document.getElementById('newUsername')?.value.trim();
-      const newDisplayName = document.getElementById('newDisplayName')?.value.trim();
-      const newPassword = document.getElementById('newPassword')?.value.trim();
-      const newUserRole = document.getElementById('newUserRole')?.value;
-      const newUserLocation = document.getElementById('newUserLocation')?.value;
-
-      if (!newUsername || !newPassword) return;
-
-      if (editingId) {
-        const idx = systemUsers.findIndex(u => u.id === editingId);
-        if (idx !== -1) {
-          systemUsers[idx] = { id: editingId, username: newUsername, display_name: newDisplayName, password: newPassword, role: newUserRole, location: newUserLocation };
-        }
-        if (isOnline && supabaseClient) {
-          await supabaseClient.from('users').update({ username: newUsername, display_name: newDisplayName, password: newPassword, role: newUserRole, location: newUserLocation }).eq('id', editingId);
-        }
-        showSaveStatus("Updated User Credentials");
-      } else {
-        const newUser = { id: "usr-" + Date.now(), username: newUsername, display_name: newDisplayName || newUsername, password: newPassword, role: newUserRole, location: newUserLocation };
-        systemUsers.push(newUser);
-        if (isOnline && supabaseClient) {
-          await supabaseClient.from('users').insert([{ username: newUsername, display_name: newDisplayName, password: newPassword, role: newUserRole, location: newUserLocation }]);
-        }
-        showSaveStatus("New User Account Created");
-      }
-
-      document.getElementById('cancelEditUserBtn')?.click();
-      renderUserList();
-    });
-
-    async function loadInventory() {
-      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-      const dayLabel = document.getElementById('dayLabel');
-      const printDate = document.getElementById('printDateValue');
-
-      if (dayLabel) {
-        const d = new Date(selectedDate);
-        dayLabel.textContent = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-      }
-      if (printDate) printDate.textContent = selectedDate;
-
-      // Check IndexedDB cache first
-      let cached = await getCachedInventory(currentStoreLocation, selectedDate);
-      if (cached && cached.length > 0) {
-        inventoryItems = cached;
-      } else if (isOnline && supabaseClient) {
-        try {
-          const { data, error } = await supabaseClient
-            .from('inventory')
-            .select('*')
-            .eq('location', currentStoreLocation)
-            .eq('record_date', selectedDate);
-          
-          if (!error && data && data.length > 0) {
-            inventoryItems = data;
-          } else {
-            // Build stock list using global masterCatalog so newly added items show up in all depots
-            inventoryItems = masterCatalog.map(item => ({
-              id: `item-${currentStoreLocation}-${item.item_code}-${selectedDate}`,
-              item_code: item.item_code,
-              description: item.description,
-              category: item.category,
-              unit: item.unit,
-              opening: 0,
-              added: 0,
-              issues: 0,
-              cost_price: item.cost_price,
-              selling_price: item.selling_price,
-              location: currentStoreLocation,
-              record_date: selectedDate,
-              comments: '',
-              updated_at: new Date().toISOString()
-            }));
-          }
-        } catch (err) {
-          inventoryItems = masterCatalog.map(item => ({
-            id: `item-${currentStoreLocation}-${item.item_code}-${selectedDate}`,
-            item_code: item.item_code,
-            description: item.description,
-            category: item.category,
-            unit: item.unit,
-            opening: 0,
-            added: 0,
-            issues: 0,
-            cost_price: item.cost_price,
-            selling_price: item.selling_price,
-            location: currentStoreLocation,
-            record_date: selectedDate,
-            comments: '',
-            updated_at: new Date().toISOString()
-          }));
-        }
-        await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-      } else {
-        inventoryItems = masterCatalog.map(item => ({
-          id: `item-${currentStoreLocation}-${item.item_code}-${selectedDate}`,
-          item_code: item.item_code,
-          description: item.description,
-          category: item.category,
-          unit: item.unit,
-          opening: 0,
-          added: 0,
-          issues: 0,
-          cost_price: item.cost_price,
-          selling_price: item.selling_price,
-          location: currentStoreLocation,
-          record_date: selectedDate,
-          comments: '',
-          updated_at: new Date().toISOString()
-        }));
-      }
-
-      renderTable();
-      updateKPIs();
-    }
-
-    function renderTable() {
-      const tbody = document.getElementById('tableBody');
-      if (!tbody) return;
-
-      const activeCatBtn = document.querySelector('#categoryFilter .bg-brand-600');
-      const activeCat = activeCatBtn ? activeCatBtn.dataset.category : 'All';
-      const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase();
-
-      let filtered = inventoryItems.filter(item => {
-        const matchesCategory = (activeCat === 'All' || item.category === activeCat);
-        const matchesSearch = (item.description || '').toLowerCase().includes(searchQuery) || (item.item_code || '').toLowerCase().includes(searchQuery);
-        return matchesCategory && matchesSearch;
-      });
-
-      tbody.innerHTML = '';
-      const emptyState = document.getElementById('emptyState');
-      if (filtered.length === 0) {
-        if (emptyState) emptyState.classList.remove('hidden');
-        return;
-      }
-      if (emptyState) emptyState.classList.add('hidden');
-
-      filtered.forEach(item => {
-        const closing = (Number(item.opening) || 0) + (Number(item.added) || 0) - (Number(item.issues) || 0);
-        const rev = (Number(item.issues) || 0) * (Number(item.selling_price) || 0);
-        const isChecked = selectedItemIds.has(item.id);
-
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
-        tr.innerHTML = `
-          <td class="p-3 text-center"><input type="checkbox" class="item-checkbox rounded" data-id="${item.id}" ${isChecked?'checked':''}></td>
-          <td class="p-3 font-mono font-bold text-slate-700">${item.item_code || 'N/A'}</td>
-          <td class="p-3 font-semibold text-slate-900">${item.description}</td>
-          <td class="p-3"><span class="px-2 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">${item.category}</span></td>
-          <td class="p-3 text-center">${item.unit}</td>
-          <td class="p-3 text-center font-semibold text-slate-700">${item.opening || 0}</td>
-          <td class="p-3 text-center text-emerald-600 font-semibold">+${item.added || 0}</td>
-          <td class="p-3 text-center text-amber-600 font-semibold">-${item.issues || 0}</td>
-          <td class="p-3 text-center font-bold ${closing <= 5 ? 'text-rose-600 bg-rose-50 rounded-lg' : 'text-slate-800'}">${closing}</td>
-          <td class="p-3 text-right text-slate-500">$${(Number(item.cost_price)||0).toFixed(2)}</td>
-          <td class="p-3 text-right font-semibold text-slate-700">$${(Number(item.selling_price)||0).toFixed(2)}</td>
-          <td class="p-3 text-right font-bold text-emerald-600">$${rev.toFixed(2)}</td>
-          <td class="p-3 text-slate-400 max-w-[150px] truncate">${item.comments || '--'}</td>
-          <td class="p-3 text-center">
-            <button onclick="editItem('${item.id}')" class="bg-slate-100 hover:bg-brand-50 hover:text-brand-600 p-1.5 rounded-lg text-slate-600 transition" title="Edit Quantities"><i class="fa-solid fa-pen-to-square"></i></button>
-            ${currentUser && currentUser.role === 'Admin' ? `<button onclick="deleteSingleItem('${item.id}')" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 p-1.5 rounded-lg text-slate-600 transition ml-1" title="Delete Item"><i class="fa-solid fa-trash"></i></button>` : ''}
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      // Bind checkboxes
-      document.querySelectorAll('.item-checkbox').forEach(cb => {
-        cb.addEventListener('change', (e) => {
-          const id = e.target.dataset.id;
-          if (e.target.checked) selectedItemIds.add(id);
-          else selectedItemIds.delete(id);
-          updateBatchDeleteButton();
-        });
-      });
-    }
-
-    function updateKPIs() {
-      let totalItems = inventoryItems.length;
-      let totalIssues = 0;
-      let dailyRevenue = 0;
-      let lowStock = 0;
-
-      inventoryItems.forEach(item => {
-        const issues = Number(item.issues) || 0;
-        const closing = (Number(item.opening) || 0) + (Number(item.added) || 0) - issues;
-        totalIssues += issues;
-        dailyRevenue += issues * (Number(item.selling_price) || 0);
-        if (closing <= 5) lowStock++;
-      });
-
-      const elItems = document.getElementById('statTotalItems');
-      const elIssues = document.getElementById('statTotalIssues');
-      const elRev = document.getElementById('statDailyRevenue');
-      const elLow = document.getElementById('statLowStock');
-
-      if (elItems) elItems.textContent = totalItems;
-      if (elIssues) elIssues.textContent = totalIssues;
-      if (elRev) elRev.textContent = `$${dailyRevenue.toFixed(2)}`;
-      if (elLow) elLow.textContent = lowStock;
-    }
-
-    // Batch Delete Logic
-    function updateBatchDeleteButton() {
-      const btn = document.getElementById('batchDeleteBtn');
-      const countSpan = document.getElementById('selectedCount');
-      if (btn && countSpan) {
-        if (selectedItemIds.size > 0 && currentUser && currentUser.role !== 'Storekeeper') {
-          btn.classList.remove('hidden');
-          countSpan.textContent = selectedItemIds.size;
-        } else {
-          btn.classList.add('hidden');
-          countSpan.textContent = '0';
-        }
-      }
-    }
-
-    document.getElementById('selectAllItems')?.addEventListener('change', (e) => {
-      if (e.target.checked) {
-        inventoryItems.forEach(i => selectedItemIds.add(i.id));
-      } else {
-        selectedItemIds.clear();
-      }
-      renderTable();
-      updateBatchDeleteButton();
-    });
-
-    document.getElementById('batchDeleteBtn')?.addEventListener('click', async () => {
-      if (selectedItemIds.size === 0) return;
-      if (currentUser?.role === 'Storekeeper') {
-        alert("Storekeepers do not have permission to delete items.");
-        return;
-      }
-      if (!confirm(`Are you sure you want to delete ${selectedItemIds.size} selected items?`)) return;
-
-      const idsToDelete = Array.from(selectedItemIds);
-      inventoryItems = inventoryItems.filter(i => !selectedItemIds.has(i.id));
-      selectedItemIds.clear();
-
-      updateBatchDeleteButton();
-      renderTable();
-      updateKPIs();
-
-      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-
-      if (isOnline && supabaseClient) {
-        await supabaseClient.from('inventory').delete().in('id', idsToDelete);
-        showSaveStatus("Items deleted");
-      } else {
-        await queueOfflineChange('delete', idsToDelete);
-        showSaveStatus("Queued deletion offline");
-      }
-    });
-
-    window.deleteSingleItem = async function(id) {
-      if (currentUser?.role === 'Storekeeper') {
-        alert("Storekeepers do not have permission to delete items.");
-        return;
-      }
-      if (!confirm("Delete this inventory record?")) return;
-      inventoryItems = inventoryItems.filter(i => i.id !== id);
-      selectedItemIds.delete(id);
-      updateBatchDeleteButton();
-      renderTable();
-      updateKPIs();
-
-      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-
-      if (isOnline && supabaseClient) {
-        await supabaseClient.from('inventory').delete().eq('id', id);
-        showSaveStatus("Deleted");
-      } else {
-        await queueOfflineChange('delete', [id]);
-        showSaveStatus("Queued offline");
-      }
-    };
-
-    window.editItem = function(id) {
-      const item = inventoryItems.find(i => i.id === id);
-      if (!item) return;
-
-      const modalTitle = document.getElementById('modalTitle');
-      const itemId = document.getElementById('itemId');
-      const originalItemCode = document.getElementById('originalItemCode');
-      const itemDescription = document.getElementById('itemDescription');
-      const itemCategory = document.getElementById('itemCategory');
-      const itemSpec = document.getElementById('itemSpec');
-      const itemOpening = document.getElementById('itemOpening');
-      const itemAdded = document.getElementById('itemAdded');
-      const itemIssues = document.getElementById('itemIssues');
-      const itemCost = document.getElementById('itemCost');
-      const itemPrice = document.getElementById('itemPrice');
-      const itemComments = document.getElementById('itemComments');
-      const deleteItemBtn = document.getElementById('deleteItemBtn');
-
-      if (modalTitle) modalTitle.textContent = "Edit Inventory Item";
-      if (itemId) itemId.value = item.item_code || item.id;
-      if (originalItemCode) originalItemCode.value = item.id;
-      if (itemDescription) itemDescription.value = item.description;
-      if (itemCategory) itemCategory.value = item.category;
-      if (itemSpec) itemSpec.value = item.unit;
-      if (itemOpening) itemOpening.value = item.opening;
-      if (itemAdded) itemAdded.value = item.added;
-      if (itemIssues) itemIssues.value = item.issues;
-      if (itemCost) itemCost.value = item.cost_price;
-      if (itemPrice) itemPrice.value = item.selling_price;
-      if (itemComments) itemComments.value = item.comments || '';
-
-      const isStorekeeper = currentUser && currentUser.role === 'Storekeeper';
-      const isAdmin = currentUser && currentUser.role === 'Admin';
-
-      if (itemOpening) itemOpening.disabled = isStorekeeper;
-      if (itemDescription) itemDescription.disabled = !isAdmin;
-      if (itemCategory) itemCategory.disabled = !isAdmin;
-      if (itemSpec) itemSpec.disabled = !isAdmin;
-      if (itemCost) itemCost.disabled = !isAdmin;
-      if (itemPrice) itemPrice.disabled = !isAdmin;
-
-      if (deleteItemBtn) {
-        if (isAdmin) deleteItemBtn.classList.remove('hidden');
-        else deleteItemBtn.classList.add('hidden');
-      }
-
-      const modal = document.getElementById('itemModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    };
-
-    const closeItemModal = () => {
-      const modal = document.getElementById('itemModal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
-    };
-
-    document.getElementById('newItemBtn')?.addEventListener('click', () => {
-      const modalTitle = document.getElementById('modalTitle');
-      const itemForm = document.getElementById('itemForm');
-      if (modalTitle) modalTitle.textContent = "Add New Inventory Item";
-      if (itemForm) itemForm.reset();
-      
-      const origId = document.getElementById('originalItemCode');
-      const itemId = document.getElementById('itemId');
-      if (origId) origId.value = "";
-      if (itemId) itemId.value = "ITEM-" + Math.floor(Math.random() * 9000);
-
-      const isStorekeeper = currentUser && currentUser.role === 'Storekeeper';
-      const isAdmin = currentUser && currentUser.role === 'Admin';
-      
-      const itemOpening = document.getElementById('itemOpening');
-      const itemDescription = document.getElementById('itemDescription');
-      const itemCategory = document.getElementById('itemCategory');
-      const itemSpec = document.getElementById('itemSpec');
-      const itemCost = document.getElementById('itemCost');
-      const itemPrice = document.getElementById('itemPrice');
-      const deleteItemBtn = document.getElementById('deleteItemBtn');
-
-      if (itemOpening) itemOpening.disabled = isStorekeeper;
-      if (itemDescription) itemDescription.disabled = !isAdmin;
-      if (itemCategory) itemCategory.disabled = !isAdmin;
-      if (itemSpec) itemSpec.disabled = !isAdmin;
-      if (itemCost) itemCost.disabled = !isAdmin;
-      if (itemPrice) itemPrice.disabled = !isAdmin;
-      if (deleteItemBtn) deleteItemBtn.classList.add('hidden');
-
-      const modal = document.getElementById('itemModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    });
-
-    document.getElementById('closeItemX')?.addEventListener('click', closeItemModal);
-    document.getElementById('cancelItemBtn')?.addEventListener('click', closeItemModal);
-
-    document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const origId = document.getElementById('originalItemCode') ? document.getElementById('originalItemCode').value : "";
-      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-
-      const nowStamp = new Date().toISOString();
-      const itemCodeVal = document.getElementById('itemId') ? document.getElementById('itemId').value : "";
-
-      // Composite ID ensures quantities remain isolated per location & date
-      const payload = {
-        id: origId || ("item-" + currentStoreLocation + "-" + itemCodeVal + "-" + selectedDate),
-        item_code: itemCodeVal,
-        description: document.getElementById('itemDescription') ? document.getElementById('itemDescription').value : "",
-        category: document.getElementById('itemCategory') ? document.getElementById('itemCategory').value : "",
-        unit: document.getElementById('itemSpec') ? document.getElementById('itemSpec').value : "",
-        opening: Number(document.getElementById('itemOpening') ? document.getElementById('itemOpening').value : 0) || 0,
-        added: Number(document.getElementById('itemAdded') ? document.getElementById('itemAdded').value : 0) || 0,
-        issues: Number(document.getElementById('itemIssues') ? document.getElementById('itemIssues').value : 0) || 0,
-        cost_price: Number(document.getElementById('itemCost') ? document.getElementById('itemCost').value : 0) || 0,
-        selling_price: Number(document.getElementById('itemPrice') ? document.getElementById('itemPrice').value : 0) || 0,
-        comments: document.getElementById('itemComments') ? document.getElementById('itemComments').value : "",
-        location: currentStoreLocation,
-        record_date: selectedDate,
-        updated_at: nowStamp
-      };
-
-      if (origId) {
-        const idx = inventoryItems.findIndex(i => i.id === origId);
-        if (idx !== -1) inventoryItems[idx] = payload;
-      } else {
-        inventoryItems.unshift(payload);
-      }
-
-      // Propagate Global Master Data (Description, Category, Unit, Prices) to matching item_code
-      await propagateGlobalMasterDataSync(itemCodeVal, payload);
-
-      renderTable();
-      updateKPIs();
-      closeItemModal();
-
-      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-
-      if (isOnline && supabaseClient) {
-        await supabaseClient.from('inventory').upsert(payload);
-        showSaveStatus("Depot Stock Saved & Global Master Synced");
-      } else {
-        await queueOfflineChange('upsert', payload);
-        showSaveStatus("Saved to Offline Cache");
-      }
-    });
-
-    // Template, Import, Backup, Restore, Reset Stock
-    document.getElementById('downloadTemplateBtn')?.addEventListener('click', () => {
-      const templateData = [
-        { "Item Code": "DRY-01", "Description": "Sample Rice 25kg", "Category": "Dry Food Items", "Unit": "Bag", "Opening": 50, "Added": 10, "Issues": 5, "Cost Price": 15.00, "Selling Price": 20.00, "Comments": "Sample row" }
-      ];
-      const ws = XLSX.utils.json_to_sheet(templateData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Master Template");
-      XLSX.writeFile(wb, "GAS_Inventory_Master_Template.xlsx");
-    });
-
-    document.getElementById('uploadExcelInput')?.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-        try {
-          const data = new Uint8Array(evt.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-          const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-
-          let importedCount = 0;
-          rows.forEach((r) => {
-            const itemCode = r["Item Code"] || r["item_code"] || ("ITEM-" + Math.floor(Math.random() * 9000));
-            const newItem = {
-              id: "item-" + currentStoreLocation + "-" + itemCode + "-" + selectedDate,
-              item_code: itemCode,
-              description: r["Description"] || r["description"] || "Imported Item",
-              category: r["Category"] || r["category"] || "Dry Food Items",
-              unit: r["Unit"] || r["unit"] || "Pcs",
-              opening: Number(r["Opening"] || r["opening"] || 0),
-              added: Number(r["Added"] || r["added"] || 0),
-              issues: Number(r["Issues"] || r["issues"] || 0),
-              cost_price: Number(r["Cost Price"] || r["cost_price"] || 0),
-              selling_price: Number(r["Selling Price"] || r["selling_price"] || 0),
-              comments: r["Comments"] || r["comments"] || "Excel Imported",
-              location: currentStoreLocation,
-              record_date: selectedDate,
-              updated_at: new Date().toISOString()
-            };
-            inventoryItems.unshift(newItem);
-            importedCount++;
-          });
-
-          renderTable();
-          updateKPIs();
-          await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-          showSaveStatus(`Imported ${importedCount} items`);
-          alert(`Successfully imported ${importedCount} inventory items!`);
-        } catch (err) {
-          alert("Error parsing Excel file: " + err.message);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    });
-
-    document.getElementById('backupBtn')?.addEventListener('click', () => {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(inventoryItems, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : 'backup';
-      downloadAnchor.setAttribute("download", `GAS_Backup_${currentStoreLocation}_${selectedDate}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-    });
-
-    document.getElementById('restoreInput')?.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-        try {
-          const restored = JSON.parse(evt.target.result);
-          if (Array.isArray(restored)) {
-            inventoryItems = restored;
-            renderTable();
-            updateKPIs();
-            const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-            await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-            alert("Inventory backup restored successfully!");
-          }
-        } catch (err) {
-          alert("Invalid backup JSON file.");
-        }
-      };
-      reader.readAsText(file);
-    });
-
-    document.getElementById('resetStockBtn')?.addEventListener('click', async () => {
-      if (!confirm("Are you sure you want to reset (zero out) Opening, Added, and Issues for all items on this date?")) return;
-      const nowStamp = new Date().toISOString();
-      inventoryItems.forEach(i => {
-        i.opening = 0;
-        i.added = 0;
-        i.issues = 0;
-        i.updated_at = nowStamp;
-      });
-      renderTable();
-      updateKPIs();
-      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-      showSaveStatus("Stock quantities reset to 0");
-    });
-
-    // Modal Action Buttons
-    document.getElementById('reorderBtn')?.addEventListener('click', () => {
-      const lowItems = inventoryItems.filter(i => ((Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0)) <= 5);
-      const list = document.getElementById('reorderItemsList');
-      if (list) {
-        if (lowItems.length === 0) {
-          list.innerHTML = `<p class="text-slate-500 text-center py-4">All stock levels are optimal!</p>`;
-        } else {
-          list.innerHTML = lowItems.map(i => `
-            <div class="flex justify-between items-center p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-              <div><p class="font-bold text-slate-800">${i.description}</p><p class="text-[10px] text-slate-500">ID: ${i.item_code} | Cat: ${i.category}</p></div>
-              <span class="font-bold text-rose-600 bg-white px-2 py-1 rounded shadow-sm">Rem: ${(Number(i.opening)||0)+(Number(i.added)||0)-(Number(i.issues)||0)} ${i.unit}</span>
-            </div>
-          `).join('');
-        }
-      }
-      const modal = document.getElementById('reorderModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    });
-
-    document.getElementById('closeReorderX')?.addEventListener('click', () => document.getElementById('reorderModal')?.classList.add('hidden'));
-    document.getElementById('closeReorderBtn')?.addEventListener('click', () => document.getElementById('reorderModal')?.classList.add('hidden'));
-
-    document.getElementById('transferBtn')?.addEventListener('click', () => {
-      const sel = document.getElementById('transferItemCode');
-      if (sel) sel.innerHTML = inventoryItems.map(i => `<option value="${i.id}">${i.description} (${i.item_code})</option>`).join('');
-      const dt = document.getElementById('transferDate');
-      if (dt) dt.valueAsDate = new Date();
-      const modal = document.getElementById('transferModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    });
-    document.getElementById('closeTransferX')?.addEventListener('click', () => document.getElementById('transferModal')?.classList.add('hidden'));
-    document.getElementById('cancelTransferBtn')?.addEventListener('click', () => document.getElementById('transferModal')?.classList.add('hidden'));
-
-    document.getElementById('requestBtn')?.addEventListener('click', () => {
-      const sel = document.getElementById('reqItemCode');
-      if (sel) sel.innerHTML = inventoryItems.map(i => `<option value="${i.id}">${i.description} (${i.item_code})</option>`).join('');
-      const modal = document.getElementById('requestModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    });
-    document.getElementById('closeRequestX')?.addEventListener('click', () => document.getElementById('requestModal')?.classList.add('hidden'));
-
-    document.getElementById('auditReportBtn')?.addEventListener('click', () => {
-      const s = document.getElementById('auditStart');
-      const e = document.getElementById('auditEnd');
-      if (s) s.valueAsDate = new Date();
-      if (e) e.valueAsDate = new Date();
-      const modal = document.getElementById('auditReportModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    });
-    document.getElementById('closeAuditX')?.addEventListener('click', () => document.getElementById('auditReportModal')?.classList.add('hidden'));
-
-    document.getElementById('manageUsersBtn')?.addEventListener('click', () => {
-      renderUserList();
-      renderDepotManagerList();
-      const modal = document.getElementById('userManagerModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    });
-    document.getElementById('closeUsersX')?.addEventListener('click', () => document.getElementById('userManagerModal')?.classList.add('hidden'));
-
-    // Export CSV
-    document.getElementById('exportBtn')?.addEventListener('click', () => {
-      let csv = "Item Code,Description,Category,Unit,Opening,Added,Issues,Closing,Cost Price,Sale Price,Comments\n";
-      inventoryItems.forEach(i => {
-        const closing = (Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0);
-        csv += `"${i.item_code}","${i.description}","${i.category}","${i.unit}",${i.opening},${i.added},${i.issues},${closing},${i.cost_price},${i.selling_price},"${i.comments||''}"\n`;
-      });
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const dateVal = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : 'report';
-      a.download = `Inventory_${currentStoreLocation}_${dateVal}.csv`;
-      a.click();
-    });
-
-    document.getElementById('printBtn')?.addEventListener('click', () => window.print());
-
-    // Category Filter Switcher
-    document.querySelectorAll('#categoryFilter .cat-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        document.querySelectorAll('#categoryFilter .cat-btn').forEach(b => {
-          b.className = "cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700";
-        });
-        e.target.className = "cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white";
-        renderTable();
-      });
-    });
-
-    document.getElementById('searchInput')?.addEventListener('input', renderTable);
-    document.getElementById('selectedDate')?.addEventListener('change', loadInventory);
-    document.getElementById('locationSelector')?.addEventListener('change', (e) => {
-      currentStoreLocation = e.target.value;
-      const badgeEl = document.getElementById('locationBadge');
-      if (badgeEl) badgeEl.textContent = currentStoreLocation + " Depot";
-      loadInventory();
-    });
-
-    document.getElementById('prevDateBtn')?.addEventListener('click', () => {
-      const dtInput = document.getElementById('selectedDate');
-      if (dtInput) {
-        const d = new Date(dtInput.value);
-        d.setDate(d.getDate() - 1);
-        dtInput.valueAsDate = d;
+      const userVal = document.getElementById('loginUser').value.trim().toLowerCase();
+      const passVal = document.getElementById('loginPass').value.trim();
+
+      const user = systemUsers.find(u => u.username.toLowerCase() === userVal && u.password === passVal);
+
+      if (user) {
+        currentUser = user;
+        currentStoreLocation = user.location || "Juba";
+        document.getElementById('loginModal').style.display = 'none';
+        
+        const locSelect = document.getElementById('locationSelector');
+        if (locSelect) locSelect.value = currentStoreLocation;
+
+        applyUserPermissions();
         loadInventory();
-      }
-    });
-
-    document.getElementById('nextDateBtn')?.addEventListener('click', () => {
-      const dtInput = document.getElementById('selectedDate');
-      if (dtInput) {
-        const d = new Date(dtInput.value);
-        d.setDate(d.getDate() + 1);
-        dtInput.valueAsDate = d;
-        loadInventory();
-      }
-    });
-
-    document.getElementById('todayBtn')?.addEventListener('click', () => {
-      const dtInput = document.getElementById('selectedDate');
-      if (dtInput) {
-        dtInput.valueAsDate = new Date();
-        loadInventory();
-      }
-    });
-
-    // Authentication & Role Control Handler
-    function loginSuccess(user) {
-      currentUser = user;
-      currentStoreLocation = user.location || "Juba";
-      
-      const userNameEl = document.getElementById('displayUserName');
-      const badgeEl = document.getElementById('locationBadge');
-      const printLoc = document.getElementById('printLocationName');
-      const printUser = document.getElementById('printUserName');
-
-      if (userNameEl) userNameEl.textContent = `${user.display_name} (${user.role})`;
-      if (badgeEl) {
-        badgeEl.textContent = currentStoreLocation + " Depot";
-        badgeEl.className = "text-xs bg-emerald-600 px-2.5 py-0.5 rounded-full ml-2 font-bold";
-      }
-      if (printLoc) printLoc.textContent = currentStoreLocation;
-      if (printUser) printUser.textContent = user.display_name;
-
-      renderDepotDropdowns();
-
-      const isStorekeeper = user.role === 'Storekeeper';
-      const isManager = user.role === 'Manager';
-      const isAdmin = user.role === 'Admin';
-
-      document.getElementById('newItemBtn')?.classList.remove('hidden');
-      document.getElementById('managerLocationBox')?.classList.remove('hidden');
-      document.getElementById('managerLocationBox')?.classList.add('flex');
-
-      if (isManager || isAdmin) {
-        document.getElementById('transferBtn')?.classList.remove('hidden');
-        document.getElementById('auditReportBtn')?.classList.remove('hidden');
       } else {
-        document.getElementById('transferBtn')?.classList.add('hidden');
-        document.getElementById('auditReportBtn')?.classList.add('hidden');
-      }
-
-      if (isAdmin) {
-        document.getElementById('manageUsersBtn')?.classList.remove('hidden');
-        document.getElementById('downloadTemplateBtn')?.classList.remove('hidden');
-        document.getElementById('uploadExcelLabel')?.classList.remove('hidden');
-        document.getElementById('backupBtn')?.classList.remove('hidden');
-        document.getElementById('restoreLabel')?.classList.remove('hidden');
-        document.getElementById('resetStockBtn')?.classList.remove('hidden');
-      } else {
-        document.getElementById('manageUsersBtn')?.classList.add('hidden');
-        document.getElementById('downloadTemplateBtn')?.classList.add('hidden');
-        document.getElementById('uploadExcelLabel')?.classList.add('hidden');
-        document.getElementById('backupBtn')?.classList.add('hidden');
-        document.getElementById('restoreLabel')?.classList.add('hidden');
-        document.getElementById('resetStockBtn')?.classList.add('hidden');
-      }
-
-      const loginModal = document.getElementById('loginModal');
-      if (loginModal) loginModal.classList.add('hidden');
-      loadInventory();
-    }
-
-    document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const loginUserEl = document.getElementById('loginUser');
-      const loginPassEl = document.getElementById('loginPass');
-      const errorDiv = document.getElementById('loginError');
-
-      const usernameInput = loginUserEl ? loginUserEl.value.trim() : '';
-      const passwordInput = loginPassEl ? loginPassEl.value.trim() : '';
-
-      if (errorDiv) errorDiv.classList.add('hidden');
-
-      const localMatch = systemUsers.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
-      if (localMatch) {
-        loginSuccess(localMatch);
-        return;
-      }
-
-      if (supabaseClient && isOnline) {
-        try {
-          const { data, error } = await supabaseClient
-            .from('users')
-            .select('*')
-            .eq('username', usernameInput)
-            .maybeSingle();
-
-          if (!error && data && data.password === passwordInput) {
-            loginSuccess(data);
-            return;
-          }
-        } catch (err) {
-          console.warn("Supabase Login Query Warning:", err);
-        }
-      }
-
-      if (errorDiv) {
-        errorDiv.textContent = "Invalid username or password.";
-        errorDiv.classList.remove('hidden');
+        document.getElementById('loginError').classList.remove('hidden');
       }
     });
 
     document.getElementById('logoutBtn')?.addEventListener('click', () => {
       currentUser = null;
-      const userNameEl = document.getElementById('displayUserName');
-      const badgeEl = document.getElementById('locationBadge');
-      const loginModal = document.getElementById('loginModal');
-
-      if (userNameEl) userNameEl.textContent = "Signed out";
-      if (badgeEl) {
-        badgeEl.textContent = "Signed out";
-        badgeEl.className = "text-xs bg-brand-700 px-2.5 py-0.5 rounded-full ml-2";
-      }
-      if (loginModal) loginModal.classList.remove('hidden');
+      document.getElementById('loginModal').style.display = 'flex';
+      document.getElementById('loginForm').reset();
+      document.getElementById('loginError').classList.add('hidden');
     });
 
-    const dtSel = document.getElementById('selectedDate');
-    if (dtSel) dtSel.valueAsDate = new Date();
+    // Date navigation bindings
+    document.getElementById('prevDateBtn')?.addEventListener('click', () => {
+      const current = new Date(getSelectedDateStr());
+      current.setDate(current.getDate() - 1);
+      document.getElementById('selectedDate').value = current.toISOString().split('T')[0];
+      loadInventory();
+    });
+
+    document.getElementById('nextDateBtn')?.addEventListener('click', () => {
+      const current = new Date(getSelectedDateStr());
+      current.setDate(current.getDate() + 1);
+      document.getElementById('selectedDate').value = current.toISOString().split('T')[0];
+      loadInventory();
+    });
+
+    document.getElementById('todayBtn')?.addEventListener('click', () => {
+      document.getElementById('selectedDate').value = new Date().toISOString().split('T')[0];
+      loadInventory();
+    });
+
+    document.getElementById('selectedDate')?.addEventListener('change', loadInventory);
+    document.getElementById('locationSelector')?.addEventListener('change', (e) => {
+      currentStoreLocation = e.target.value;
+      applyUserPermissions();
+      loadInventory();
+    });
+
+    // Search & Filter event listeners
+    document.getElementById('searchInput')?.addEventListener('input', renderTable);
+    document.querySelectorAll('.cat-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.cat-btn').forEach(b => {
+          b.className = 'cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700';
+        });
+        e.target.className = 'cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white';
+        renderTable();
+      });
+    });
+
+    // Print & Export Handlers
+    document.getElementById('printBtn')?.addEventListener('click', () => window.print());
+
+    document.getElementById('exportBtn')?.addEventListener('click', () => {
+      if (inventoryItems.length === 0) return;
+      let csv = 'Item ID,Description,Category,Unit,Opening,Added,Issues,Closing,Cost Price,Sale Price,Est Revenue,Comments\n';
+      inventoryItems.forEach(i => {
+        const closing = (Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0);
+        const rev = (Number(i.issues)||0) * (Number(i.selling_price)||0);
+        csv += `"${i.item_code}","${i.description}","${i.category}","${i.unit}",${i.opening},${i.added},${i.issues},${closing},${i.cost_price},${i.selling_price},${rev},"${i.comments||''}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Inventory_${currentStoreLocation}_${getSelectedDateStr()}.csv`;
+      a.click();
+    });
+
+    // Template Download Handler
+    document.getElementById('downloadTemplateBtn')?.addEventListener('click', () => {
+      const data = [
+        ["Item ID", "Description", "Category", "Unit", "Opening Stock", "Unit Cost", "Selling Price"],
+        ["DRY-01", "Rice 25kg Bag", "Dry Food Items", "Bag", 10, 18.00, 24.00],
+        ["DRK-01", "Coca Cola 330ml", "Soft Drinks", "Pack", 15, 12.00, 18.00]
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Master Template");
+      XLSX.writeFile(wb, "GAS_Inventory_Master_Template.xlsx");
+    });
+
+    // Reset Stock Handler
+    document.getElementById('resetStockBtn')?.addEventListener('click', async () => {
+      if (!confirm(`Are you sure you want to ZERO all stock quantities for ${currentStoreLocation} on ${getSelectedDateStr()}?`)) return;
+      inventoryItems.forEach(i => {
+        i.opening = 0;
+        i.added = 0;
+        i.issues = 0;
+      });
+      const dateStr = getSelectedDateStr();
+      await setCachedInventory(currentStoreLocation, dateStr, inventoryItems);
+      renderTable();
+      showSaveStatus("Stock Quantities Reset");
+    });
+
+    // App Initialization
+    window.onload = function() {
+      const today = new Date().toISOString().split('T')[0];
+      const dateInput = document.getElementById('selectedDate');
+      if (dateInput) dateInput.value = today;
+      
+      // Auto-trigger login for rapid start
+      document.getElementById('loginUser').value = 'admin';
+      document.getElementById('loginPass').value = 'password123';
+      
+      updateNetworkStatus();
+    };
   </script>
 </body>
 </html>
