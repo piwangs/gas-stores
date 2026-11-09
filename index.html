@@ -463,12 +463,8 @@
       { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
     ];
 
-    // Master catalog repository (shared across all depots)
-    let masterCatalog = [
-      { item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', cost_price: 18.00, selling_price: 24.00 },
-      { item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', cost_price: 9.50, selling_price: 12.50 },
-      { item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', cost_price: 12.00, selling_price: 18.00 }
-    ];
+    // Master catalog repository (shared across all depots - starts clean)
+    let masterCatalog = [];
 
     let initializedDepots = new Set();
 
@@ -641,7 +637,7 @@
       const key = `${currentStoreLocation}_${dateStr}`;
       if (!fetched || fetched.length === 0) {
         if (!initializedDepots.has(key)) {
-          // Initialize from Master Catalog on first run
+          // Populate from global master catalog (if any items exist)
           fetched = masterCatalog.map(m => ({
             id: `item-${currentStoreLocation}-${m.item_code}-${dateStr}`,
             location: currentStoreLocation,
