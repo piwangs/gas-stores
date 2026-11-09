@@ -627,31 +627,27 @@
 
   // Global Master Data Sync Function Across Depots and Dates
   async function propagateGlobalMasterDataSync(itemCode, updatedMaster) {
-    // 1. Update in memory current dataset
+    // 1. Update in-memory current dataset for matching items
     inventoryItems.forEach(item => {
       if (item.item_code === itemCode || item.id === updatedMaster.id) {
         item.description = updatedMaster.description;
         item.category = updatedMaster.category;
         item.unit = updatedMaster.unit;
-        if (currentUser?.role === 'Admin') {
-          item.cost_price = updatedMaster.cost_price;
-          item.selling_price = updatedMaster.selling_price;
-        }
+        item.cost_price = updatedMaster.cost_price;
+        item.selling_price = updatedMaster.selling_price;
       }
     });
 
-    // 2. Update Supabase Cloud DB globally across all locations & date records
+    // 2. Update Supabase Cloud DB globally across ALL depots for this item_code
     if (isOnline && supabaseClient) {
       try {
         const updatePayload = {
           description: updatedMaster.description,
           category: updatedMaster.category,
-          unit: updatedMaster.unit
+          unit: updatedMaster.unit,
+          cost_price: updatedMaster.cost_price,
+          selling_price: updatedMaster.selling_price
         };
-        if (currentUser?.role === 'Admin') {
-          updatePayload.cost_price = updatedMaster.cost_price;
-          updatePayload.selling_price = updatedMaster.selling_price;
-        }
         await supabaseClient
           .from('inventory')
           .update(updatePayload)
@@ -1150,6 +1146,7 @@
     const nowStamp = new Date().toISOString();
     const itemCodeVal = document.getElementById('itemId') ? document.getElementById('itemId').value : "";
 
+    // Quantity fields and comments are depot-specific; master info is global
     const payload = {
       id: origId || ("item-" + Date.now()),
       item_code: itemCodeVal,
@@ -1174,7 +1171,7 @@
       inventoryItems.unshift(payload);
     }
 
-    // Trigger Global Synchronization across all locations
+    // Trigger Global Synchronization of master catalog fields across all depots
     await propagateGlobalMasterDataSync(itemCodeVal, payload);
 
     renderTable();
@@ -1185,7 +1182,7 @@
 
     if (isOnline && supabaseClient) {
       await supabaseClient.from('inventory').upsert(payload);
-      showSaveStatus("Saved & Global Synced");
+      showSaveStatus("Depot Stock Saved & Global Master Synced");
     } else {
       await queueOfflineChange('upsert', payload);
       showSaveStatus("Saved to Offline Cache");
