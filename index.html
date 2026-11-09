@@ -182,7 +182,7 @@
       </div>
       <div class="flex items-center gap-2">
         <input id="searchInput" type="search" placeholder="Search item..." class="w-full md:w-64 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
-        <button id="batchDeleteBtn" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition"><i class="fa-solid fa-trash mr-1"></i>Delete Selected (<span id="selectedCount">0</span>)</button>
+        <button id="batchDeleteBtn" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition hidden"><i class="fa-solid fa-trash mr-1"></i>Delete Selected (<span id="selectedCount">0</span>)</button>
       </div>
     </section>
 
@@ -244,7 +244,7 @@
               <label class="block text-xs font-semibold mb-1 text-slate-600">Item ID (Global)</label>
               <input id="itemId" required readonly class="w-full bg-slate-100 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-600" placeholder="Auto">
               <input type="hidden" id="originalItemCode" value="">
-              <p id="itemIdHint" class="hidden text-[10px] text-amber-700 mt-1">Managers can change this ID — it updates in every depot.</p>
+              <p id="itemIdHint" class="hidden text-[10px] text-amber-700 mt-1">Admins can change this ID — it updates in every depot.</p>
             </div>
             <div class="col-span-2">
               <label class="block text-xs font-semibold mb-1 text-slate-600">Description (Global)</label>
@@ -351,8 +351,6 @@
       <div class="flex justify-between items-center border-b pb-3">
         <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-clipboard-list text-emerald-600 mr-2"></i>Store Requisitions & Memo Requests</h3>
         <div class="flex items-center gap-2">
-          <button id="exportReqExcelBtn" type="button" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2.5 py-1.5 rounded-lg text-xs font-semibold"><i class="fa-solid fa-file-excel mr-1"></i>Excel</button>
-          <button id="exportReqPdfBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold"><i class="fa-solid fa-file-pdf mr-1"></i>Print/PDF</button>
           <button id="closeRequestX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
       </div>
@@ -410,41 +408,41 @@
       
       <div class="space-y-2">
         <h3 class="font-bold text-sm text-slate-800">Depot Locations</h3>
-      <form id="locationForm" class="flex flex-col sm:flex-row gap-2">
-        <input id="newLocationName" required maxlength="80" placeholder="New location name (e.g. Bentiu Main Camp)" class="border rounded-lg p-2 flex-1 text-sm">
-        <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">Add Depot</button>
-      </form>
-      <div id="locationList" class="space-y-1.5 pt-2"></div>
-    </div>
-
-    <hr class="my-4">
-
-    <h3 class="font-bold text-sm text-slate-800" id="userFormTitle">Create Account</h3>
-    <form id="userForm" class="grid sm:grid-cols-2 gap-3">
-      <input type="hidden" id="editingUserId" value="">
-      <input id="newUsername" required minlength="3" maxlength="40" autocomplete="off" placeholder="Username" class="border rounded-lg p-2 text-sm">
-      <input id="newDisplayName" required maxlength="80" placeholder="Full name" class="border rounded-lg p-2 text-sm">
-      <input id="newPassword" required minlength="4" type="password" autocomplete="new-password" placeholder="Password" class="border rounded-lg p-2 text-sm">
-      <select id="newUserRole" required class="border rounded-lg p-2 text-sm font-semibold">
-        <option value="Storekeeper">Storekeeper</option>
-        <option value="Manager">Manager</option>
-        <option value="Admin">Admin (Full Rights)</option>
-      </select>
-      <select id="newUserLocation" required class="border rounded-lg p-2 text-sm sm:col-span-2"></select>
-      <div class="sm:col-span-2 flex gap-2">
-        <button type="submit" id="saveUserBtn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-2 font-semibold text-sm shadow-md">Create Account</button>
-        <button type="button" id="cancelEditUserBtn" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg px-4 py-2 font-semibold text-sm">Cancel Edit</button>
+        <form id="locationForm" class="flex flex-col sm:flex-row gap-2">
+          <input id="newLocationName" required maxlength="80" placeholder="New location name (e.g. Bentiu Main Camp)" class="border rounded-lg p-2 flex-1 text-sm">
+          <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">Add Depot</button>
+        </form>
+        <div id="locationList" class="space-y-1.5 pt-2"></div>
       </div>
-    </form>
 
-    <hr class="my-4">
+      <hr class="my-4">
 
-    <h3 class="font-bold text-sm text-slate-800">Existing System Accounts</h3>
-    <div id="userList" class="space-y-2 pt-1 text-xs"></div>
+      <h3 class="font-bold text-sm text-slate-800" id="userFormTitle">Create Account</h3>
+      <form id="userForm" class="grid sm:grid-cols-2 gap-3">
+        <input type="hidden" id="editingUserId" value="">
+        <input id="newUsername" required minlength="3" maxlength="40" autocomplete="off" placeholder="Username" class="border rounded-lg p-2 text-sm">
+        <input id="newDisplayName" required maxlength="80" placeholder="Full name" class="border rounded-lg p-2 text-sm">
+        <input id="newPassword" required minlength="4" type="password" autocomplete="new-password" placeholder="Password" class="border rounded-lg p-2 text-sm">
+        <select id="newUserRole" required class="border rounded-lg p-2 text-sm font-semibold">
+          <option value="Storekeeper">Storekeeper</option>
+          <option value="Manager">Manager</option>
+          <option value="Admin">Admin (Full Rights)</option>
+        </select>
+        <select id="newUserLocation" required class="border rounded-lg p-2 text-sm sm:col-span-2"></select>
+        <div class="sm:col-span-2 flex gap-2">
+          <button type="submit" id="saveUserBtn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-2 font-semibold text-sm shadow-md">Create Account</button>
+          <button type="button" id="cancelEditUserBtn" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg px-4 py-2 font-semibold text-sm">Cancel Edit</button>
+        </div>
+      </form>
+
+      <hr class="my-4">
+
+      <h3 class="font-bold text-sm text-slate-800">Existing System Accounts</h3>
+      <div id="userList" class="space-y-2 pt-1 text-xs"></div>
+    </div>
   </div>
-</div>
 
-<script>
+  <script>
     // Supabase Configuration & Initialization
     const SUPABASE_URL = "https://chfpcwlpmzcyorifzpja.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZnBjd2xwbXpjeW9yaWZ6cGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwMjE5MzEsImV4cCI6MjEwOTU5NzkzMX0.73G3XXghDxrwVxbDibXemM5LB57LHUZdw4nK_Nc4lLo";
@@ -492,19 +490,19 @@
     const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 Hours offline storage window
 
     let systemUsers = [
-    { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Admin', location: 'Juba' },
-    { id: '2', username: 'manager', password: 'password123', display_name: 'Store Manager', role: 'Manager', location: 'Juba' },
-    { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
-  ];
-
-    // Seed default sample data if completely empty
-    const sampleItems = [
-      { id: 'item-101', item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', opening: 50, added: 20, issues: 5, cost_price: 18.00, selling_price: 24.00, location: 'Juba', comments: 'Main Stock', updated_at: new Date().toISOString() },
-      { id: 'item-102', item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', opening: 40, added: 10, issues: 8, cost_price: 9.50, selling_price: 12.50, location: 'Juba', comments: 'Fresh arrival', updated_at: new Date().toISOString() },
-      { id: 'item-103', item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', opening: 100, added: 0, issues: 15, cost_price: 12.00, selling_price: 18.00, location: 'Juba', comments: 'Cold store', updated_at: new Date().toISOString() }
+      { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Admin', location: 'Juba' },
+      { id: '2', username: 'manager', password: 'password123', display_name: 'Store Manager', role: 'Manager', location: 'Juba' },
+      { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
     ];
 
-    // Cache management using idb-keyval (12-hour offline persistence)
+    // Seed default sample master catalog items
+    const sampleItems = [
+      { id: 'item-Juba-DRY-01-default', item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', opening: 50, added: 20, issues: 5, cost_price: 18.00, selling_price: 24.00, location: 'Juba', comments: 'Main Stock', updated_at: new Date().toISOString() },
+      { id: 'item-Juba-DRY-02-default', item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', opening: 40, added: 10, issues: 8, cost_price: 9.50, selling_price: 12.50, location: 'Juba', comments: 'Fresh arrival', updated_at: new Date().toISOString() },
+      { id: 'item-Juba-DRK-01-default', item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', opening: 100, added: 0, issues: 15, cost_price: 12.00, selling_price: 18.00, location: 'Juba', comments: 'Cold store', updated_at: new Date().toISOString() }
+    ];
+
+    // Cache management using idb-keyval
     async function getCachedInventory(location, dateStr) {
       try {
         if (typeof idbKeyval !== 'undefined') {
@@ -565,631 +563,561 @@
       }
     }
 
-    // Populate Depot dropdowns safely
+    // Populate Depot dropdowns
     function renderDepotDropdowns() {
-    const locSelect = document.getElementById('locationSelector');
-    const itemLocSelect = document.getElementById('itemTargetLocation');
-    const transferFrom = document.getElementById('transferFromLoc');
-    const transferTo = document.getElementById('transferToLoc');
-    const newUserLoc = document.getElementById('newUserLocation');
+      const locSelect = document.getElementById('locationSelector');
+      const itemLocSelect = document.getElementById('itemTargetLocation');
+      const transferFrom = document.getElementById('transferFromLoc');
+      const transferTo = document.getElementById('transferToLoc');
+      const newUserLoc = document.getElementById('newUserLocation');
 
-    if (locSelect) locSelect.innerHTML = availableDepots.map(d => `<option value="${d}" ${d===currentStoreLocation?'selected':''}>${d} Depot</option>`).join('');
-    if (itemLocSelect) itemLocSelect.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
-    if (transferFrom) transferFrom.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
-    if (transferTo) transferTo.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
-    if (newUserLoc) newUserLoc.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
-    
-    renderDepotManagerList();
-  }
+      if (locSelect) locSelect.innerHTML = availableDepots.map(d => `<option value="${d}" ${d===currentStoreLocation?'selected':''}>${d} Depot</option>`).join('');
+      if (itemLocSelect) itemLocSelect.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+      if (transferFrom) transferFrom.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+      if (transferTo) transferTo.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+      if (newUserLoc) newUserLoc.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+      
+      renderDepotManagerList();
+    }
 
-  function renderDepotManagerList() {
-    const locList = document.getElementById('locationList');
-    if (!locList) return;
-    locList.innerHTML = availableDepots.map(d => `
-      <div class="flex justify-between items-center p-2 bg-slate-50 border border-slate-200 rounded-lg">
-        <span class="font-bold text-xs text-slate-800"><i class="fa-solid fa-warehouse text-brand-600 mr-1.5"></i>${d} Depot</span>
-        <div class="flex items-center gap-2">
-          <span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Active</span>
-          ${(currentUser?.role === 'Admin' && availableDepots.length > 1) ? 
-            `<button type="button" onclick="deleteDepot('${d}')" class="text-rose-600 hover:bg-rose-50 px-2 py-1 rounded text-xs transition" title="Delete Depot"><i class="fa-solid fa-trash"></i></button>` : ''}
+    function renderDepotManagerList() {
+      const locList = document.getElementById('locationList');
+      if (!locList) return;
+      locList.innerHTML = availableDepots.map(d => `
+        <div class="flex justify-between items-center p-2 bg-slate-50 border border-slate-200 rounded-lg">
+          <span class="font-bold text-xs text-slate-800"><i class="fa-solid fa-warehouse text-brand-600 mr-1.5"></i>${d} Depot</span>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Active</span>
+            ${(currentUser?.role === 'Admin' && availableDepots.length > 1) ? 
+              `<button type="button" onclick="deleteDepot('${d}')" class="text-rose-600 hover:bg-rose-50 px-2 py-1 rounded text-xs transition" title="Delete Depot"><i class="fa-solid fa-trash"></i></button>` : ''}
+          </div>
         </div>
-      </div>
-    `).join('');
-  }
-
-  window.deleteDepot = function(depotName) {
-    if (!confirm(`Are you sure you want to delete '${depotName} Depot'?`)) return;
-    const isAssigned = systemUsers.some(u => u.location === depotName);
-    if (isAssigned) {
-      alert(`Cannot delete '${depotName} Depot' because user accounts are assigned to it.`);
-      return;
+      `).join('');
     }
-    availableDepots = availableDepots.filter(d => d !== depotName);
-    renderDepotDropdowns();
-    showSaveStatus(`Deleted ${depotName} Depot`);
-  };
 
-  document.getElementById('locationForm')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const input = document.getElementById('newLocationName');
-    const name = input ? input.value.trim() : '';
-    if (!name) return;
-    if (availableDepots.some(d => d.toLowerCase() === name.toLowerCase())) {
-      alert("A depot with this name already exists.");
-      return;
-    }
-    availableDepots.push(name);
-    input.value = '';
-    renderDepotDropdowns();
-    showSaveStatus(`Added ${name} Depot`);
-  });
-
-  // Global Master Data Sync Function Across Depots and Dates
-  async function propagateGlobalMasterDataSync(itemCode, updatedMaster) {
-    // 1. Update in-memory current dataset for matching items
-    inventoryItems.forEach(item => {
-      if (item.item_code === itemCode || item.id === updatedMaster.id) {
-        item.description = updatedMaster.description;
-        item.category = updatedMaster.category;
-        item.unit = updatedMaster.unit;
-        item.cost_price = updatedMaster.cost_price;
-        item.selling_price = updatedMaster.selling_price;
+    window.deleteDepot = function(depotName) {
+      if (!confirm(`Are you sure you want to delete '${depotName} Depot'?`)) return;
+      const isAssigned = systemUsers.some(u => u.location === depotName);
+      if (isAssigned) {
+        alert(`Cannot delete '${depotName} Depot' because user accounts are assigned to it.`);
+        return;
       }
+      availableDepots = availableDepots.filter(d => d !== depotName);
+      renderDepotDropdowns();
+      showSaveStatus(`Deleted ${depotName} Depot`);
+    };
+
+    document.getElementById('locationForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const input = document.getElementById('newLocationName');
+      const name = input ? input.value.trim() : '';
+      if (!name) return;
+      if (availableDepots.some(d => d.toLowerCase() === name.toLowerCase())) {
+        alert("A depot with this name already exists.");
+        return;
+      }
+      availableDepots.push(name);
+      input.value = '';
+      renderDepotDropdowns();
+      showSaveStatus(`Added ${name} Depot`);
     });
 
-    // 2. Update Supabase Cloud DB globally across ALL depots for this item_code
-    if (isOnline && supabaseClient) {
-      try {
-        const updatePayload = {
-          description: updatedMaster.description,
-          category: updatedMaster.category,
-          unit: updatedMaster.unit,
-          cost_price: updatedMaster.cost_price,
-          selling_price: updatedMaster.selling_price
-        };
-        await supabaseClient
-          .from('inventory')
-          .update(updatePayload)
-          .eq('item_code', itemCode);
-          
-        showSaveStatus("Global Master Data Synced Across Depots");
-      } catch (err) {
-        console.warn("Global master sync warning:", err);
-      }
-    }
-  }
-
-  // Account Management & Credentials Editing
-  function renderUserList() {
-    const userListEl = document.getElementById('userList');
-    if (!userListEl) return;
-    userListEl.innerHTML = systemUsers.map(u => `
-      <div class="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-        <div>
-          <p class="font-bold text-slate-800">${u.display_name} <span class="text-slate-400">(@${u.username})</span></p>
-          <p class="text-[10px] text-slate-500">Role: <span class="font-bold text-brand-600">${u.role}</span> | Depot: ${u.location}</p>
-        </div>
-        <div class="flex items-center gap-1">
-          ${(currentUser && currentUser.role === 'Admin') ? `
-            <button type="button" onclick="editUserAccount('${u.id}')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition" title="Edit User"><i class="fa-solid fa-pen-to-square"></i></button>
-            ${u.username !== currentUser.username ? `<button type="button" onclick="deleteUserAccount('${u.id}')" class="text-rose-600 hover:bg-rose-50 p-1.5 rounded transition" title="Delete User"><i class="fa-solid fa-trash"></i></button>` : ''}
-          ` : ''}
-        </div>
-      </div>
-    `).join('');
-  }
-
-  window.editUserAccount = function(id) {
-    const u = systemUsers.find(usr => usr.id === id);
-    if (!u) return;
-    document.getElementById('editingUserId').value = u.id;
-    document.getElementById('newUsername').value = u.username;
-    document.getElementById('newDisplayName').value = u.display_name;
-    document.getElementById('newPassword').value = u.password;
-    document.getElementById('newUserRole').value = u.role;
-    document.getElementById('newUserLocation').value = u.location;
-
-    document.getElementById('userFormTitle').textContent = "Edit User Account (@" + u.username + ")";
-    document.getElementById('saveUserBtn').textContent = "Update Credentials";
-    document.getElementById('cancelEditUserBtn').classList.remove('hidden');
-  };
-
-  document.getElementById('cancelEditUserBtn')?.addEventListener('click', () => {
-    document.getElementById('userForm')?.reset();
-    document.getElementById('editingUserId').value = "";
-    document.getElementById('userFormTitle').textContent = "Create Account";
-    document.getElementById('saveUserBtn').textContent = "Create Account";
-    document.getElementById('cancelEditUserBtn').classList.add('hidden');
-  });
-
-  document.getElementById('userForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const editingId = document.getElementById('editingUserId')?.value;
-    const newUsername = document.getElementById('newUsername')?.value.trim();
-    const newDisplayName = document.getElementById('newDisplayName')?.value.trim();
-    const newPassword = document.getElementById('newPassword')?.value.trim();
-    const newUserRole = document.getElementById('newUserRole')?.value;
-    const newUserLocation = document.getElementById('newUserLocation')?.value;
-
-    if (!newUsername || !newPassword) return;
-
-    if (editingId) {
-      // Update existing account
-      const idx = systemUsers.findIndex(u => u.id === editingId);
-      if (idx !== -1) {
-        systemUsers[idx] = { id: editingId, username: newUsername, display_name: newDisplayName, password: newPassword, role: newUserRole, location: newUserLocation };
-      }
-      if (isOnline && supabaseClient) {
-        await supabaseClient.from('users').update({ username: newUsername, display_name: newDisplayName, password: newPassword, role: newUserRole, location: newUserLocation }).eq('id', editingId);
-      }
-      showSaveStatus("Updated User Credentials");
-    } else {
-      // Create new account
-      const newUser = { id: "usr-" + Date.now(), username: newUsername, display_name: newDisplayName || newUsername, password: newPassword, role: newUserRole, location: newUserLocation };
-      systemUsers.push(newUser);
-      if (isOnline && supabaseClient) {
-        await supabaseClient.from('users').insert([{ username: newUsername, display_name: newDisplayName, password: newPassword, role: newUserRole, location: newUserLocation }]);
-      }
-      showSaveStatus("New User Account Created");
-    }
-
-    document.getElementById('cancelEditUserBtn')?.click();
-    renderUserList();
-  });
-
-  // Global Master Data Sync Function Across Depots and Dates
-  async function propagateGlobalMasterDataSync(itemCode, updatedMaster) {
-    // 1. Update in memory current dataset
-    inventoryItems.forEach(item => {
-      if (item.item_code === itemCode || item.id === updatedMaster.id) {
-        item.description = updatedMaster.description;
-        item.category = updatedMaster.category;
-        item.unit = updatedMaster.unit;
-        if (currentUser?.role === 'Admin') {
+    // Global Master Data Sync Function Across Depots and Dates
+    async function propagateGlobalMasterDataSync(itemCode, updatedMaster) {
+      // 1. Update matching master catalog items in active dataset memory
+      inventoryItems.forEach(item => {
+        if (item.item_code === itemCode) {
+          item.description = updatedMaster.description;
+          item.category = updatedMaster.category;
+          item.unit = updatedMaster.unit;
           item.cost_price = updatedMaster.cost_price;
           item.selling_price = updatedMaster.selling_price;
         }
-      }
-    });
-
-    // 2. Update Supabase Cloud DB globally across all locations & date records
-    if (isOnline && supabaseClient) {
-      try {
-        const updatePayload = {
-          description: updatedMaster.description,
-          category: updatedMaster.category,
-          unit: updatedMaster.unit
-        };
-        if (currentUser?.role === 'Admin') {
-          updatePayload.cost_price = updatedMaster.cost_price;
-          updatePayload.selling_price = updatedMaster.selling_price;
-        }
-        await supabaseClient
-          .from('inventory')
-          .update(updatePayload)
-          .eq('item_code', itemCode);
-          
-        showSaveStatus("Global Master Data Synced Across Depots");
-      } catch (err) {
-        console.warn("Global master sync warning:", err);
-      }
-    }
-  }
-
-  // Account Management & Credentials Editing
-  function renderUserList() {
-    const userListEl = document.getElementById('userList');
-    if (!userListEl) return;
-    userListEl.innerHTML = systemUsers.map(u => `
-      <div class="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-        <div>
-          <p class="font-bold text-slate-800">${u.display_name} <span class="text-slate-400">(@${u.username})</span></p>
-          <p class="text-[10px] text-slate-500">Role: <span class="font-bold text-brand-600">${u.role}</span> | Depot: ${u.location}</p>
-        </div>
-        <div class="flex items-center gap-1">
-          ${(currentUser && currentUser.role === 'Admin') ? `
-            <button type="button" onclick="editUserAccount('${u.id}')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition" title="Edit User"><i class="fa-solid fa-pen-to-square"></i></button>
-            ${u.username !== currentUser.username ? `<button type="button" onclick="deleteUserAccount('${u.id}')" class="text-rose-600 hover:bg-rose-50 p-1.5 rounded transition" title="Delete User"><i class="fa-solid fa-trash"></i></button>` : ''}
-          ` : ''}
-        </div>
-      </div>
-    `).join('');
-  }
-
-  window.editUserAccount = function(id) {
-    const u = systemUsers.find(usr => usr.id === id);
-    if (!u) return;
-    document.getElementById('editingUserId').value = u.id;
-    document.getElementById('newUsername').value = u.username;
-    document.getElementById('newDisplayName').value = u.display_name;
-    document.getElementById('newPassword').value = u.password;
-    document.getElementById('newUserRole').value = u.role;
-    document.getElementById('newUserLocation').value = u.location;
-
-    document.getElementById('userFormTitle').textContent = "Edit User Account (@" + u.username + ")";
-    document.getElementById('saveUserBtn').textContent = "Update Credentials";
-    document.getElementById('cancelEditUserBtn').classList.remove('hidden');
-  };
-
-  window.deleteUserAccount = async function(id) {
-    if (!confirm("Delete this user account?")) return;
-    systemUsers = systemUsers.filter(u => u.id !== id);
-    renderUserList();
-    if (isOnline && supabaseClient) {
-      await supabaseClient.from('users').delete().eq('id', id);
-    }
-    showSaveStatus("Account deleted");
-  };
-
-  document.getElementById('cancelEditUserBtn')?.addEventListener('click', () => {
-    document.getElementById('userForm')?.reset();
-    document.getElementById('editingUserId').value = "";
-    document.getElementById('userFormTitle').textContent = "Create Account";
-    document.getElementById('saveUserBtn').textContent = "Create Account";
-    document.getElementById('cancelEditUserBtn').classList.add('hidden');
-  });
-
-  async function loadInventory() {
-    const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-    const dayLabel = document.getElementById('dayLabel');
-    const printDate = document.getElementById('printDateValue');
-
-    if (dayLabel) {
-      const d = new Date(selectedDate);
-      dayLabel.textContent = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-    }
-    if (printDate) printDate.textContent = selectedDate;
-
-    // Check IndexedDB cache first
-    let cached = await getCachedInventory(currentStoreLocation, selectedDate);
-    if (cached) {
-      inventoryItems = cached;
-    } else if (isOnline && supabaseClient) {
-      try {
-        const { data, error } = await supabaseClient
-          .from('inventory')
-          .select('*')
-          .eq('location', currentStoreLocation)
-          .eq('record_date', selectedDate);
-        
-        if (!error && data && data.length > 0) {
-          inventoryItems = data;
-        } else {
-          inventoryItems = sampleItems.map(item => ({ ...item, location: currentStoreLocation, record_date: selectedDate }));
-        }
-      } catch (err) {
-        inventoryItems = sampleItems.map(item => ({ ...item, location: currentStoreLocation, record_date: selectedDate }));
-      }
-      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-    } else {
-      inventoryItems = sampleItems.map(item => ({ ...item, location: currentStoreLocation, record_date: selectedDate }));
-    }
-
-    renderTable();
-    updateKPIs();
-  }
-
-  function renderTable() {
-    const tbody = document.getElementById('tableBody');
-    if (!tbody) return;
-
-    const activeCatBtn = document.querySelector('#categoryFilter .bg-brand-600');
-    const activeCat = activeCatBtn ? activeCatBtn.dataset.category : 'All';
-    const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase();
-
-    let filtered = inventoryItems.filter(item => {
-      const matchesCategory = (activeCat === 'All' || item.category === activeCat);
-      const matchesSearch = (item.description || '').toLowerCase().includes(searchQuery) || (item.item_code || '').toLowerCase().includes(searchQuery);
-      return matchesCategory && matchesSearch;
-    });
-
-    tbody.innerHTML = '';
-    const emptyState = document.getElementById('emptyState');
-    if (filtered.length === 0) {
-      if (emptyState) emptyState.classList.remove('hidden');
-      return;
-    }
-    if (emptyState) emptyState.classList.add('hidden');
-
-    filtered.forEach(item => {
-      const closing = (Number(item.opening) || 0) + (Number(item.added) || 0) - (Number(item.issues) || 0);
-      const rev = (Number(item.issues) || 0) * (Number(item.selling_price) || 0);
-      const isChecked = selectedItemIds.has(item.id);
-
-      const tr = document.createElement('tr');
-      tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
-      tr.innerHTML = `
-        <td class="p-3 text-center"><input type="checkbox" class="item-checkbox rounded" data-id="${item.id}" ${isChecked?'checked':''}></td>
-        <td class="p-3 font-mono font-bold text-slate-700">${item.item_code || 'N/A'}</td>
-        <td class="p-3 font-semibold text-slate-900">${item.description}</td>
-        <td class="p-3"><span class="px-2 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">${item.category}</span></td>
-        <td class="p-3 text-center">${item.unit}</td>
-        <td class="p-3 text-center font-semibold text-slate-700">${item.opening || 0}</td>
-        <td class="p-3 text-center text-emerald-600 font-semibold">+${item.added || 0}</td>
-        <td class="p-3 text-center text-amber-600 font-semibold">-${item.issues || 0}</td>
-        <td class="p-3 text-center font-bold ${closing <= 5 ? 'text-rose-600 bg-rose-50 rounded-lg' : 'text-slate-800'}">${closing}</td>
-        <td class="p-3 text-right text-slate-500">$${(Number(item.cost_price)||0).toFixed(2)}</td>
-        <td class="p-3 text-right font-semibold text-slate-700">$${(Number(item.selling_price)||0).toFixed(2)}</td>
-        <td class="p-3 text-right font-bold text-emerald-600">$${rev.toFixed(2)}</td>
-        <td class="p-3 text-slate-400 max-w-[150px] truncate">${item.comments || '--'}</td>
-        <td class="p-3 text-center">
-          <button onclick="editItem('${item.id}')" class="bg-slate-100 hover:bg-brand-50 hover:text-brand-600 p-1.5 rounded-lg text-slate-600 transition" title="Edit Quantities"><i class="fa-solid fa-pen-to-square"></i></button>
-          ${currentUser && currentUser.role === 'Admin' ? `<button onclick="deleteSingleItem('${item.id}')" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 p-1.5 rounded-lg text-slate-600 transition ml-1" title="Delete Item"><i class="fa-solid fa-trash"></i></button>` : ''}
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    // Bind checkboxes
-    document.querySelectorAll('.item-checkbox').forEach(cb => {
-      cb.addEventListener('change', (e) => {
-        const id = e.target.dataset.id;
-        if (e.target.checked) selectedItemIds.add(id);
-        else selectedItemIds.delete(id);
-        updateBatchDeleteButton();
       });
-    });
-  }
 
-  function updateKPIs() {
-    let totalItems = inventoryItems.length;
-    let totalIssues = 0;
-    let dailyRevenue = 0;
-    let lowStock = 0;
-
-    inventoryItems.forEach(item => {
-      const issues = Number(item.issues) || 0;
-      const closing = (Number(item.opening) || 0) + (Number(item.added) || 0) - issues;
-      totalIssues += issues;
-      dailyRevenue += issues * (Number(item.selling_price) || 0);
-      if (closing <= 5) lowStock++;
-    });
-
-    const elItems = document.getElementById('statTotalItems');
-    const elIssues = document.getElementById('statTotalIssues');
-    const elRev = document.getElementById('statDailyRevenue');
-    const elLow = document.getElementById('statLowStock');
-
-    if (elItems) elItems.textContent = totalItems;
-    if (elIssues) elIssues.textContent = totalIssues;
-    if (elRev) elRev.textContent = `$${dailyRevenue.toFixed(2)}`;
-    if (elLow) elLow.textContent = lowStock;
-  }
-
-  // Batch Delete Logic
-  function updateBatchDeleteButton() {
-    const btn = document.getElementById('batchDeleteBtn');
-    const countSpan = document.getElementById('selectedCount');
-    if (btn && countSpan) {
-      if (selectedItemIds.size > 0 && currentUser && currentUser.role !== 'Storekeeper') {
-        btn.classList.remove('hidden');
-        countSpan.textContent = selectedItemIds.size;
-      } else {
-        btn.classList.add('hidden');
-        countSpan.textContent = '0';
+      // 2. Update Supabase Cloud DB globally across ALL depots & dates for this item_code
+      if (isOnline && supabaseClient) {
+        try {
+          const updatePayload = {
+            description: updatedMaster.description,
+            category: updatedMaster.category,
+            unit: updatedMaster.unit,
+            cost_price: updatedMaster.cost_price,
+            selling_price: updatedMaster.selling_price
+          };
+          await supabaseClient
+            .from('inventory')
+            .update(updatePayload)
+            .eq('item_code', itemCode);
+            
+          showSaveStatus("Global Master Data Synced Across Depots");
+        } catch (err) {
+          console.warn("Global master sync warning:", err);
+        }
       }
     }
-  }
 
-  document.getElementById('selectAllItems')?.addEventListener('change', (e) => {
-    if (e.target.checked) {
-      inventoryItems.forEach(i => selectedItemIds.add(i.id));
-    } else {
-      selectedItemIds.clear();
-    }
-    renderTable();
-    updateBatchDeleteButton();
-  });
-
-  document.getElementById('batchDeleteBtn')?.addEventListener('click', async () => {
-    if (selectedItemIds.size === 0) return;
-    if (currentUser?.role === 'Storekeeper') {
-      alert("Storekeepers do not have permission to delete items.");
-      return;
-    }
-    if (!confirm(`Are you sure you want to delete ${selectedItemIds.size} selected items?`)) return;
-
-    const idsToDelete = Array.from(selectedItemIds);
-    inventoryItems = inventoryItems.filter(i => !selectedItemIds.has(i.id));
-    selectedItemIds.clear();
-
-    updateBatchDeleteButton();
-    renderTable();
-    updateKPIs();
-
-    const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-    await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-
-    if (isOnline && supabaseClient) {
-      await supabaseClient.from('inventory').delete().in('id', idsToDelete);
-      showSaveStatus("Items deleted");
-    } else {
-      await queueOfflineChange('delete', idsToDelete);
-      showSaveStatus("Queued deletion offline");
-    }
-  });
-
-  window.deleteSingleItem = async function(id) {
-    if (currentUser?.role === 'Storekeeper') {
-      alert("Storekeepers do not have permission to delete items.");
-      return;
-    }
-    if (!confirm("Delete this inventory record?")) return;
-    inventoryItems = inventoryItems.filter(i => i.id !== id);
-    selectedItemIds.delete(id);
-    updateBatchDeleteButton();
-    renderTable();
-    updateKPIs();
-
-    const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-    await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
-
-    if (isOnline && supabaseClient) {
-      await supabaseClient.from('inventory').delete().eq('id', id);
-      showSaveStatus("Deleted");
-    } else {
-      await queueOfflineChange('delete', [id]);
-      showSaveStatus("Queued offline");
-    }
-  };
-
-  window.editItem = function(id) {
-    const item = inventoryItems.find(i => i.id === id);
-    if (!item) return;
-
-    const modalTitle = document.getElementById('modalTitle');
-    const itemId = document.getElementById('itemId');
-    const originalItemCode = document.getElementById('originalItemCode');
-    const itemDescription = document.getElementById('itemDescription');
-    const itemCategory = document.getElementById('itemCategory');
-    const itemSpec = document.getElementById('itemSpec');
-    const itemOpening = document.getElementById('itemOpening');
-    const itemAdded = document.getElementById('itemAdded');
-    const itemIssues = document.getElementById('itemIssues');
-    const itemCost = document.getElementById('itemCost');
-    const itemPrice = document.getElementById('itemPrice');
-    const itemComments = document.getElementById('itemComments');
-    const deleteItemBtn = document.getElementById('deleteItemBtn');
-
-    if (modalTitle) modalTitle.textContent = "Edit Inventory Item";
-    if (itemId) itemId.value = item.item_code || item.id;
-    if (originalItemCode) originalItemCode.value = item.id;
-    if (itemDescription) itemDescription.value = item.description;
-    if (itemCategory) itemCategory.value = item.category;
-    if (itemSpec) itemSpec.value = item.unit;
-    if (itemOpening) itemOpening.value = item.opening;
-    if (itemAdded) itemAdded.value = item.added;
-    if (itemIssues) itemIssues.value = item.issues;
-    if (itemCost) itemCost.value = item.cost_price;
-    if (itemPrice) itemPrice.value = item.selling_price;
-    if (itemComments) itemComments.value = item.comments || '';
-
-    // Access restriction: Storekeepers are allowed to edit ONLY Added, Issues, and Comments.
-    const isStorekeeper = currentUser && currentUser.role === 'Storekeeper';
-    const isAdmin = currentUser && currentUser.role === 'Admin';
-
-    if (itemOpening) itemOpening.disabled = isStorekeeper;
-    if (itemDescription) itemDescription.disabled = !isAdmin;
-    if (itemCategory) itemCategory.disabled = !isAdmin;
-    if (itemSpec) itemSpec.disabled = !isAdmin;
-    if (itemCost) itemCost.disabled = !isAdmin;
-    if (itemPrice) itemPrice.disabled = !isAdmin;
-
-    if (deleteItemBtn) {
-      if (isAdmin) deleteItemBtn.classList.remove('hidden');
-      else deleteItemBtn.classList.add('hidden');
+    // Account Management & Credentials Editing
+    function renderUserList() {
+      const userListEl = document.getElementById('userList');
+      if (!userListEl) return;
+      userListEl.innerHTML = systemUsers.map(u => `
+        <div class="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+          <div>
+            <p class="font-bold text-slate-800">${u.display_name} <span class="text-slate-400">(@${u.username})</span></p>
+            <p class="text-[10px] text-slate-500">Role: <span class="font-bold text-brand-600">${u.role}</span> | Depot: ${u.location}</p>
+          </div>
+          <div class="flex items-center gap-1">
+            ${(currentUser && currentUser.role === 'Admin') ? `
+              <button type="button" onclick="editUserAccount('${u.id}')" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition" title="Edit User"><i class="fa-solid fa-pen-to-square"></i></button>
+              ${u.username !== currentUser.username ? `<button type="button" onclick="deleteUserAccount('${u.id}')" class="text-rose-600 hover:bg-rose-50 p-1.5 rounded transition" title="Delete User"><i class="fa-solid fa-trash"></i></button>` : ''}
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
     }
 
-    const modal = document.getElementById('itemModal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-  };
+    window.editUserAccount = function(id) {
+      const u = systemUsers.find(usr => usr.id === id);
+      if (!u) return;
+      document.getElementById('editingUserId').value = u.id;
+      document.getElementById('newUsername').value = u.username;
+      document.getElementById('newDisplayName').value = u.display_name;
+      document.getElementById('newPassword').value = u.password;
+      document.getElementById('newUserRole').value = u.role;
+      document.getElementById('newUserLocation').value = u.location;
 
-  const closeItemModal = () => {
-    const modal = document.getElementById('itemModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
-  };
-
-  document.getElementById('newItemBtn')?.addEventListener('click', () => {
-    const modalTitle = document.getElementById('modalTitle');
-    const itemForm = document.getElementById('itemForm');
-    if (modalTitle) modalTitle.textContent = "Add New Inventory Item";
-    if (itemForm) itemForm.reset();
-    
-    const origId = document.getElementById('originalItemCode');
-    const itemId = document.getElementById('itemId');
-    if (origId) origId.value = "";
-    if (itemId) itemId.value = "ITEM-" + Math.floor(Math.random() * 9000);
-
-    const isStorekeeper = currentUser && currentUser.role === 'Storekeeper';
-    const isAdmin = currentUser && currentUser.role === 'Admin';
-    
-    const itemOpening = document.getElementById('itemOpening');
-    const itemDescription = document.getElementById('itemDescription');
-    const itemCategory = document.getElementById('itemCategory');
-    const itemSpec = document.getElementById('itemSpec');
-    const itemCost = document.getElementById('itemCost');
-    const itemPrice = document.getElementById('itemPrice');
-    const deleteItemBtn = document.getElementById('deleteItemBtn');
-
-    if (itemOpening) itemOpening.disabled = isStorekeeper;
-    if (itemDescription) itemDescription.disabled = !isAdmin;
-    if (itemCategory) itemCategory.disabled = !isAdmin;
-    if (itemSpec) itemSpec.disabled = !isAdmin;
-    if (itemCost) itemCost.disabled = !isAdmin;
-    if (itemPrice) itemPrice.disabled = !isAdmin;
-    if (deleteItemBtn) deleteItemBtn.classList.add('hidden');
-
-    const modal = document.getElementById('itemModal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-  });
-
-  document.getElementById('closeItemX')?.addEventListener('click', closeItemModal);
-  document.getElementById('cancelItemBtn')?.addEventListener('click', closeItemModal);
-
-  document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const origId = document.getElementById('originalItemCode') ? document.getElementById('originalItemCode').value : "";
-    const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
-
-    const nowStamp = new Date().toISOString();
-    const itemCodeVal = document.getElementById('itemId') ? document.getElementById('itemId').value : "";
-
-    // Quantity fields and comments are depot-specific; master info is global
-    const payload = {
-      id: origId || ("item-" + Date.now()),
-      item_code: itemCodeVal,
-      description: document.getElementById('itemDescription') ? document.getElementById('itemDescription').value : "",
-      category: document.getElementById('itemCategory') ? document.getElementById('itemCategory').value : "",
-      unit: document.getElementById('itemSpec') ? document.getElementById('itemSpec').value : "",
-      opening: Number(document.getElementById('itemOpening') ? document.getElementById('itemOpening').value : 0) || 0,
-      added: Number(document.getElementById('itemAdded') ? document.getElementById('itemAdded').value : 0) || 0,
-      issues: Number(document.getElementById('itemIssues') ? document.getElementById('itemIssues').value : 0) || 0,
-      cost_price: Number(document.getElementById('itemCost') ? document.getElementById('itemCost').value : 0) || 0,
-      selling_price: Number(document.getElementById('itemPrice') ? document.getElementById('itemPrice').value : 0) || 0,
-      comments: document.getElementById('itemComments') ? document.getElementById('itemComments').value : "",
-      location: currentStoreLocation,
-      record_date: selectedDate,
-      updated_at: nowStamp
+      document.getElementById('userFormTitle').textContent = "Edit User Account (@" + u.username + ")";
+      document.getElementById('saveUserBtn').textContent = "Update Credentials";
+      document.getElementById('cancelEditUserBtn').classList.remove('hidden');
     };
 
-    if (origId) {
-      const idx = inventoryItems.findIndex(i => i.id === origId);
-      if (idx !== -1) inventoryItems[idx] = payload;
-    } else {
-      inventoryItems.unshift(payload);
+    window.deleteUserAccount = async function(id) {
+      if (!confirm("Delete this user account?")) return;
+      systemUsers = systemUsers.filter(u => u.id !== id);
+      renderUserList();
+      if (isOnline && supabaseClient) {
+        await supabaseClient.from('users').delete().eq('id', id);
+      }
+      showSaveStatus("Account deleted");
+    };
+
+    document.getElementById('cancelEditUserBtn')?.addEventListener('click', () => {
+      document.getElementById('userForm')?.reset();
+      document.getElementById('editingUserId').value = "";
+      document.getElementById('userFormTitle').textContent = "Create Account";
+      document.getElementById('saveUserBtn').textContent = "Create Account";
+      document.getElementById('cancelEditUserBtn').classList.add('hidden');
+    });
+
+    document.getElementById('userForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const editingId = document.getElementById('editingUserId')?.value;
+      const newUsername = document.getElementById('newUsername')?.value.trim();
+      const newDisplayName = document.getElementById('newDisplayName')?.value.trim();
+      const newPassword = document.getElementById('newPassword')?.value.trim();
+      const newUserRole = document.getElementById('newUserRole')?.value;
+      const newUserLocation = document.getElementById('newUserLocation')?.value;
+
+      if (!newUsername || !newPassword) return;
+
+      if (editingId) {
+        const idx = systemUsers.findIndex(u => u.id === editingId);
+        if (idx !== -1) {
+          systemUsers[idx] = { id: editingId, username: newUsername, display_name: newDisplayName, password: newPassword, role: newUserRole, location: newUserLocation };
+        }
+        if (isOnline && supabaseClient) {
+          await supabaseClient.from('users').update({ username: newUsername, display_name: newDisplayName, password: newPassword, role: newUserRole, location: newUserLocation }).eq('id', editingId);
+        }
+        showSaveStatus("Updated User Credentials");
+      } else {
+        const newUser = { id: "usr-" + Date.now(), username: newUsername, display_name: newDisplayName || newUsername, password: newPassword, role: newUserRole, location: newUserLocation };
+        systemUsers.push(newUser);
+        if (isOnline && supabaseClient) {
+          await supabaseClient.from('users').insert([{ username: newUsername, display_name: newDisplayName, password: newPassword, role: newUserRole, location: newUserLocation }]);
+        }
+        showSaveStatus("New User Account Created");
+      }
+
+      document.getElementById('cancelEditUserBtn')?.click();
+      renderUserList();
+    });
+
+    async function loadInventory() {
+      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+      const dayLabel = document.getElementById('dayLabel');
+      const printDate = document.getElementById('printDateValue');
+
+      if (dayLabel) {
+        const d = new Date(selectedDate);
+        dayLabel.textContent = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      }
+      if (printDate) printDate.textContent = selectedDate;
+
+      // Check IndexedDB cache first
+      let cached = await getCachedInventory(currentStoreLocation, selectedDate);
+      if (cached) {
+        inventoryItems = cached;
+      } else if (isOnline && supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient
+            .from('inventory')
+            .select('*')
+            .eq('location', currentStoreLocation)
+            .eq('record_date', selectedDate);
+          
+          if (!error && data && data.length > 0) {
+            inventoryItems = data;
+          } else {
+            inventoryItems = sampleItems.map(item => ({ 
+              ...item, 
+              id: `item-${currentStoreLocation}-${item.item_code}-${selectedDate}`,
+              location: currentStoreLocation, 
+              record_date: selectedDate 
+            }));
+          }
+        } catch (err) {
+          inventoryItems = sampleItems.map(item => ({ 
+            ...item, 
+            id: `item-${currentStoreLocation}-${item.item_code}-${selectedDate}`,
+            location: currentStoreLocation, 
+            record_date: selectedDate 
+          }));
+        }
+        await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+      } else {
+        inventoryItems = sampleItems.map(item => ({ 
+          ...item, 
+          id: `item-${currentStoreLocation}-${item.item_code}-${selectedDate}`,
+          location: currentStoreLocation, 
+          record_date: selectedDate 
+        }));
+      }
+
+      renderTable();
+      updateKPIs();
     }
 
-    // Trigger Global Synchronization of master catalog fields across all depots
-    await propagateGlobalMasterDataSync(itemCodeVal, payload);
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      if (!tbody) return;
 
-    renderTable();
-    updateKPIs();
-    closeItemModal();
+      const activeCatBtn = document.querySelector('#categoryFilter .bg-brand-600');
+      const activeCat = activeCatBtn ? activeCatBtn.dataset.category : 'All';
+      const searchQuery = (document.getElementById('searchInput')?.value || '').toLowerCase();
 
-    await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+      let filtered = inventoryItems.filter(item => {
+        const matchesCategory = (activeCat === 'All' || item.category === activeCat);
+        const matchesSearch = (item.description || '').toLowerCase().includes(searchQuery) || (item.item_code || '').toLowerCase().includes(searchQuery);
+        return matchesCategory && matchesSearch;
+      });
 
-    if (isOnline && supabaseClient) {
-      await supabaseClient.from('inventory').upsert(payload);
-      showSaveStatus("Depot Stock Saved & Global Master Synced");
-    } else {
-      await queueOfflineChange('upsert', payload);
-      showSaveStatus("Saved to Offline Cache");
+      tbody.innerHTML = '';
+      const emptyState = document.getElementById('emptyState');
+      if (filtered.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        return;
+      }
+      if (emptyState) emptyState.classList.add('hidden');
+
+      filtered.forEach(item => {
+        const closing = (Number(item.opening) || 0) + (Number(item.added) || 0) - (Number(item.issues) || 0);
+        const rev = (Number(item.issues) || 0) * (Number(item.selling_price) || 0);
+        const isChecked = selectedItemIds.has(item.id);
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+        tr.innerHTML = `
+          <td class="p-3 text-center"><input type="checkbox" class="item-checkbox rounded" data-id="${item.id}" ${isChecked?'checked':''}></td>
+          <td class="p-3 font-mono font-bold text-slate-700">${item.item_code || 'N/A'}</td>
+          <td class="p-3 font-semibold text-slate-900">${item.description}</td>
+          <td class="p-3"><span class="px-2 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">${item.category}</span></td>
+          <td class="p-3 text-center">${item.unit}</td>
+          <td class="p-3 text-center font-semibold text-slate-700">${item.opening || 0}</td>
+          <td class="p-3 text-center text-emerald-600 font-semibold">+${item.added || 0}</td>
+          <td class="p-3 text-center text-amber-600 font-semibold">-${item.issues || 0}</td>
+          <td class="p-3 text-center font-bold ${closing <= 5 ? 'text-rose-600 bg-rose-50 rounded-lg' : 'text-slate-800'}">${closing}</td>
+          <td class="p-3 text-right text-slate-500">$${(Number(item.cost_price)||0).toFixed(2)}</td>
+          <td class="p-3 text-right font-semibold text-slate-700">$${(Number(item.selling_price)||0).toFixed(2)}</td>
+          <td class="p-3 text-right font-bold text-emerald-600">$${rev.toFixed(2)}</td>
+          <td class="p-3 text-slate-400 max-w-[150px] truncate">${item.comments || '--'}</td>
+          <td class="p-3 text-center">
+            <button onclick="editItem('${item.id}')" class="bg-slate-100 hover:bg-brand-50 hover:text-brand-600 p-1.5 rounded-lg text-slate-600 transition" title="Edit Quantities"><i class="fa-solid fa-pen-to-square"></i></button>
+            ${currentUser && currentUser.role === 'Admin' ? `<button onclick="deleteSingleItem('${item.id}')" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 p-1.5 rounded-lg text-slate-600 transition ml-1" title="Delete Item"><i class="fa-solid fa-trash"></i></button>` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Bind checkboxes
+      document.querySelectorAll('.item-checkbox').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const id = e.target.dataset.id;
+          if (e.target.checked) selectedItemIds.add(id);
+          else selectedItemIds.delete(id);
+          updateBatchDeleteButton();
+        });
+      });
     }
-  });
 
-  // --- Functional Fixes: Template, Excel Upload, Backup, Restore, Reset ---
+    function updateKPIs() {
+      let totalItems = inventoryItems.length;
+      let totalIssues = 0;
+      let dailyRevenue = 0;
+      let lowStock = 0;
+
+      inventoryItems.forEach(item => {
+        const issues = Number(item.issues) || 0;
+        const closing = (Number(item.opening) || 0) + (Number(item.added) || 0) - issues;
+        totalIssues += issues;
+        dailyRevenue += issues * (Number(item.selling_price) || 0);
+        if (closing <= 5) lowStock++;
+      });
+
+      const elItems = document.getElementById('statTotalItems');
+      const elIssues = document.getElementById('statTotalIssues');
+      const elRev = document.getElementById('statDailyRevenue');
+      const elLow = document.getElementById('statLowStock');
+
+      if (elItems) elItems.textContent = totalItems;
+      if (elIssues) elIssues.textContent = totalIssues;
+      if (elRev) elRev.textContent = `$${dailyRevenue.toFixed(2)}`;
+      if (elLow) elLow.textContent = lowStock;
+    }
+
+    // Batch Delete Logic
+    function updateBatchDeleteButton() {
+      const btn = document.getElementById('batchDeleteBtn');
+      const countSpan = document.getElementById('selectedCount');
+      if (btn && countSpan) {
+        if (selectedItemIds.size > 0 && currentUser && currentUser.role !== 'Storekeeper') {
+          btn.classList.remove('hidden');
+          countSpan.textContent = selectedItemIds.size;
+        } else {
+          btn.classList.add('hidden');
+          countSpan.textContent = '0';
+        }
+      }
+    }
+
+    document.getElementById('selectAllItems')?.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        inventoryItems.forEach(i => selectedItemIds.add(i.id));
+      } else {
+        selectedItemIds.clear();
+      }
+      renderTable();
+      updateBatchDeleteButton();
+    });
+
+    document.getElementById('batchDeleteBtn')?.addEventListener('click', async () => {
+      if (selectedItemIds.size === 0) return;
+      if (currentUser?.role === 'Storekeeper') {
+        alert("Storekeepers do not have permission to delete items.");
+        return;
+      }
+      if (!confirm(`Are you sure you want to delete ${selectedItemIds.size} selected items?`)) return;
+
+      const idsToDelete = Array.from(selectedItemIds);
+      inventoryItems = inventoryItems.filter(i => !selectedItemIds.has(i.id));
+      selectedItemIds.clear();
+
+      updateBatchDeleteButton();
+      renderTable();
+      updateKPIs();
+
+      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        await supabaseClient.from('inventory').delete().in('id', idsToDelete);
+        showSaveStatus("Items deleted");
+      } else {
+        await queueOfflineChange('delete', idsToDelete);
+        showSaveStatus("Queued deletion offline");
+      }
+    });
+
+    window.deleteSingleItem = async function(id) {
+      if (currentUser?.role === 'Storekeeper') {
+        alert("Storekeepers do not have permission to delete items.");
+        return;
+      }
+      if (!confirm("Delete this inventory record?")) return;
+      inventoryItems = inventoryItems.filter(i => i.id !== id);
+      selectedItemIds.delete(id);
+      updateBatchDeleteButton();
+      renderTable();
+      updateKPIs();
+
+      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        await supabaseClient.from('inventory').delete().eq('id', id);
+        showSaveStatus("Deleted");
+      } else {
+        await queueOfflineChange('delete', [id]);
+        showSaveStatus("Queued offline");
+      }
+    };
+
+    window.editItem = function(id) {
+      const item = inventoryItems.find(i => i.id === id);
+      if (!item) return;
+
+      const modalTitle = document.getElementById('modalTitle');
+      const itemId = document.getElementById('itemId');
+      const originalItemCode = document.getElementById('originalItemCode');
+      const itemDescription = document.getElementById('itemDescription');
+      const itemCategory = document.getElementById('itemCategory');
+      const itemSpec = document.getElementById('itemSpec');
+      const itemOpening = document.getElementById('itemOpening');
+      const itemAdded = document.getElementById('itemAdded');
+      const itemIssues = document.getElementById('itemIssues');
+      const itemCost = document.getElementById('itemCost');
+      const itemPrice = document.getElementById('itemPrice');
+      const itemComments = document.getElementById('itemComments');
+      const deleteItemBtn = document.getElementById('deleteItemBtn');
+
+      if (modalTitle) modalTitle.textContent = "Edit Inventory Item";
+      if (itemId) itemId.value = item.item_code || item.id;
+      if (originalItemCode) originalItemCode.value = item.id;
+      if (itemDescription) itemDescription.value = item.description;
+      if (itemCategory) itemCategory.value = item.category;
+      if (itemSpec) itemSpec.value = item.unit;
+      if (itemOpening) itemOpening.value = item.opening;
+      if (itemAdded) itemAdded.value = item.added;
+      if (itemIssues) itemIssues.value = item.issues;
+      if (itemCost) itemCost.value = item.cost_price;
+      if (itemPrice) itemPrice.value = item.selling_price;
+      if (itemComments) itemComments.value = item.comments || '';
+
+      const isStorekeeper = currentUser && currentUser.role === 'Storekeeper';
+      const isAdmin = currentUser && currentUser.role === 'Admin';
+
+      if (itemOpening) itemOpening.disabled = isStorekeeper;
+      if (itemDescription) itemDescription.disabled = !isAdmin;
+      if (itemCategory) itemCategory.disabled = !isAdmin;
+      if (itemSpec) itemSpec.disabled = !isAdmin;
+      if (itemCost) itemCost.disabled = !isAdmin;
+      if (itemPrice) itemPrice.disabled = !isAdmin;
+
+      if (deleteItemBtn) {
+        if (isAdmin) deleteItemBtn.classList.remove('hidden');
+        else deleteItemBtn.classList.add('hidden');
+      }
+
+      const modal = document.getElementById('itemModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    };
+
+    const closeItemModal = () => {
+      const modal = document.getElementById('itemModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    };
+
+    document.getElementById('newItemBtn')?.addEventListener('click', () => {
+      const modalTitle = document.getElementById('modalTitle');
+      const itemForm = document.getElementById('itemForm');
+      if (modalTitle) modalTitle.textContent = "Add New Inventory Item";
+      if (itemForm) itemForm.reset();
+      
+      const origId = document.getElementById('originalItemCode');
+      const itemId = document.getElementById('itemId');
+      if (origId) origId.value = "";
+      if (itemId) itemId.value = "ITEM-" + Math.floor(Math.random() * 9000);
+
+      const isStorekeeper = currentUser && currentUser.role === 'Storekeeper';
+      const isAdmin = currentUser && currentUser.role === 'Admin';
+      
+      const itemOpening = document.getElementById('itemOpening');
+      const itemDescription = document.getElementById('itemDescription');
+      const itemCategory = document.getElementById('itemCategory');
+      const itemSpec = document.getElementById('itemSpec');
+      const itemCost = document.getElementById('itemCost');
+      const itemPrice = document.getElementById('itemPrice');
+      const deleteItemBtn = document.getElementById('deleteItemBtn');
+
+      if (itemOpening) itemOpening.disabled = isStorekeeper;
+      if (itemDescription) itemDescription.disabled = !isAdmin;
+      if (itemCategory) itemCategory.disabled = !isAdmin;
+      if (itemSpec) itemSpec.disabled = !isAdmin;
+      if (itemCost) itemCost.disabled = !isAdmin;
+      if (itemPrice) itemPrice.disabled = !isAdmin;
+      if (deleteItemBtn) deleteItemBtn.classList.add('hidden');
+
+      const modal = document.getElementById('itemModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    });
+
+    document.getElementById('closeItemX')?.addEventListener('click', closeItemModal);
+    document.getElementById('cancelItemBtn')?.addEventListener('click', closeItemModal);
+
+    document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const origId = document.getElementById('originalItemCode') ? document.getElementById('originalItemCode').value : "";
+      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+
+      const nowStamp = new Date().toISOString();
+      const itemCodeVal = document.getElementById('itemId') ? document.getElementById('itemId').value : "";
+
+      // Composite ID ensures quantities remain isolated per location & date
+      const payload = {
+        id: origId || ("item-" + currentStoreLocation + "-" + itemCodeVal + "-" + selectedDate),
+        item_code: itemCodeVal,
+        description: document.getElementById('itemDescription') ? document.getElementById('itemDescription').value : "",
+        category: document.getElementById('itemCategory') ? document.getElementById('itemCategory').value : "",
+        unit: document.getElementById('itemSpec') ? document.getElementById('itemSpec').value : "",
+        opening: Number(document.getElementById('itemOpening') ? document.getElementById('itemOpening').value : 0) || 0,
+        added: Number(document.getElementById('itemAdded') ? document.getElementById('itemAdded').value : 0) || 0,
+        issues: Number(document.getElementById('itemIssues') ? document.getElementById('itemIssues').value : 0) || 0,
+        cost_price: Number(document.getElementById('itemCost') ? document.getElementById('itemCost').value : 0) || 0,
+        selling_price: Number(document.getElementById('itemPrice') ? document.getElementById('itemPrice').value : 0) || 0,
+        comments: document.getElementById('itemComments') ? document.getElementById('itemComments').value : "",
+        location: currentStoreLocation,
+        record_date: selectedDate,
+        updated_at: nowStamp
+      };
+
+      if (origId) {
+        const idx = inventoryItems.findIndex(i => i.id === origId);
+        if (idx !== -1) inventoryItems[idx] = payload;
+      } else {
+        inventoryItems.unshift(payload);
+      }
+
+      // Propagate Global Master Data (Description, Category, Unit, Prices) to matching item_code
+      await propagateGlobalMasterDataSync(itemCodeVal, payload);
+
+      renderTable();
+      updateKPIs();
+      closeItemModal();
+
+      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        await supabaseClient.from('inventory').upsert(payload);
+        showSaveStatus("Depot Stock Saved & Global Master Synced");
+      } else {
+        await queueOfflineChange('upsert', payload);
+        showSaveStatus("Saved to Offline Cache");
+      }
+    });
+
+    // Template, Import, Backup, Restore, Reset Stock
     document.getElementById('downloadTemplateBtn')?.addEventListener('click', () => {
       const templateData = [
         { "Item Code": "DRY-01", "Description": "Sample Rice 25kg", "Category": "Dry Food Items", "Unit": "Bag", "Opening": 50, "Added": 10, "Issues": 5, "Cost Price": 15.00, "Selling Price": 20.00, "Comments": "Sample row" }
@@ -1214,9 +1142,10 @@
 
           let importedCount = 0;
           rows.forEach((r) => {
+            const itemCode = r["Item Code"] || r["item_code"] || ("ITEM-" + Math.floor(Math.random() * 9000));
             const newItem = {
-              id: "item-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
-              item_code: r["Item Code"] || r["item_code"] || ("ITEM-" + Math.floor(Math.random() * 9000)),
+              id: "item-" + currentStoreLocation + "-" + itemCode + "-" + selectedDate,
+              item_code: itemCode,
               description: r["Description"] || r["description"] || "Imported Item",
               category: r["Category"] || r["category"] || "Dry Food Items",
               unit: r["Unit"] || r["unit"] || "Pcs",
@@ -1295,7 +1224,7 @@
       showSaveStatus("Stock quantities reset to 0");
     });
 
-    // Toolbar Button Safe Handlers
+    // Modal Action Buttons
     document.getElementById('reorderBtn')?.addEventListener('click', () => {
       const lowItems = inventoryItems.filter(i => ((Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0)) <= 5);
       const list = document.getElementById('reorderItemsList');
@@ -1360,8 +1289,8 @@
     document.getElementById('closeAuditX')?.addEventListener('click', () => document.getElementById('auditReportModal')?.classList.add('hidden'));
 
     document.getElementById('manageUsersBtn')?.addEventListener('click', () => {
-      const locList = document.getElementById('locationList');
-      if (locList) locList.innerHTML = availableDepots.map(d => `<div class="flex justify-between items-center p-2 bg-slate-50 border rounded-lg"><span class="font-bold text-xs">${d} Depot</span><span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Active</span></div>`).join('');
+      renderUserList();
+      renderDepotManagerList();
       const modal = document.getElementById('userManagerModal');
       if (modal) {
         modal.classList.remove('hidden');
@@ -1372,10 +1301,10 @@
 
     // Export CSV
     document.getElementById('exportBtn')?.addEventListener('click', () => {
-      let csv = "Item Code,Description,Category,Unit,Opening,Added,Issues,Closing,Cost Price,Sale Price,Last Updated,Comments\n";
+      let csv = "Item Code,Description,Category,Unit,Opening,Added,Issues,Closing,Cost Price,Sale Price,Comments\n";
       inventoryItems.forEach(i => {
         const closing = (Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0);
-        csv += `"${i.item_code}","${i.description}","${i.category}","${i.unit}",${i.opening},${i.added},${i.issues},${closing},${i.cost_price},${i.selling_price},"${i.updated_at||''}" "${i.comments||''}"\n`;
+        csv += `"${i.item_code}","${i.description}","${i.category}","${i.unit}",${i.opening},${i.added},${i.issues},${closing},${i.cost_price},${i.selling_price},"${i.comments||''}"\n`;
       });
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
@@ -1401,7 +1330,12 @@
 
     document.getElementById('searchInput')?.addEventListener('input', renderTable);
     document.getElementById('selectedDate')?.addEventListener('change', loadInventory);
-    document.getElementById('locationSelector')?.addEventListener('change', loadInventory);
+    document.getElementById('locationSelector')?.addEventListener('change', (e) => {
+      currentStoreLocation = e.target.value;
+      const badgeEl = document.getElementById('locationBadge');
+      if (badgeEl) badgeEl.textContent = currentStoreLocation + " Depot";
+      loadInventory();
+    });
 
     document.getElementById('prevDateBtn')?.addEventListener('click', () => {
       const dtInput = document.getElementById('selectedDate');
@@ -1431,12 +1365,11 @@
       }
     });
 
-    // Role Permission Engine & Login Handler
+    // Authentication & Role Control Handler
     function loginSuccess(user) {
       currentUser = user;
       currentStoreLocation = user.location || "Juba";
       
-      // Update UI Header
       const userNameEl = document.getElementById('displayUserName');
       const badgeEl = document.getElementById('locationBadge');
       const printLoc = document.getElementById('printLocationName');
@@ -1452,16 +1385,10 @@
 
       renderDepotDropdowns();
 
-      // Configure Permissions according to Role:
-      // Storekeeper: Print reports, view, and edit daily quantities (opening, added, issues).
-      // Manager: View, edit quantities, print reports, transfer stock, requisitions, audit reports.
-      // Admin: Full access (create accounts, master template, restore/backup, delete items, reset stock).
-
       const isStorekeeper = user.role === 'Storekeeper';
       const isManager = user.role === 'Manager';
       const isAdmin = user.role === 'Admin';
 
-      // Daily items & printing available for everyone
       document.getElementById('newItemBtn')?.classList.remove('hidden');
       document.getElementById('managerLocationBox')?.classList.remove('hidden');
       document.getElementById('managerLocationBox')?.classList.add('flex');
@@ -1490,7 +1417,6 @@
         document.getElementById('resetStockBtn')?.classList.add('hidden');
       }
 
-      // Hide Login Modal & load dataset
       const loginModal = document.getElementById('loginModal');
       if (loginModal) loginModal.classList.add('hidden');
       loadInventory();
@@ -1507,14 +1433,12 @@
 
       if (errorDiv) errorDiv.classList.add('hidden');
 
-      // 1. Local check for instant login verification
       const localMatch = systemUsers.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
       if (localMatch) {
         loginSuccess(localMatch);
         return;
       }
 
-      // 2. Query Supabase users table
       if (supabaseClient && isOnline) {
         try {
           const { data, error } = await supabaseClient
@@ -1538,7 +1462,6 @@
       }
     });
 
-    // Logout handler
     document.getElementById('logoutBtn')?.addEventListener('click', () => {
       currentUser = null;
       const userNameEl = document.getElementById('displayUserName');
@@ -1553,7 +1476,6 @@
       if (loginModal) loginModal.classList.remove('hidden');
     });
 
-    // Initialize Date Selector to Today safely
     const dtSel = document.getElementById('selectedDate');
     if (dtSel) dtSel.valueAsDate = new Date();
   </script>
