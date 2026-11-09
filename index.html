@@ -194,6 +194,7 @@
               <th class="p-3 text-right">Cost Price</th>
               <th class="p-3 text-right">Sale Price</th>
               <th class="p-3 text-right">Est. Revenue</th>
+              <th class="p-3">Updated Timestamp</th>
               <th class="p-3">Comments</th>
               <th class="p-3 text-center">Actions</th>
             </tr>
@@ -416,6 +417,7 @@
         <input id="newPassword" required minlength="8" type="password" autocomplete="new-password" placeholder="Password (8+ chars)" class="border rounded-lg p-2 text-sm">
         <select id="newUserRole" required class="border rounded-lg p-2 text-sm font-semibold">
           <option value="Storekeeper">Storekeeper</option>
+          <option value="Lower Level Manager">Lower Level Manager</option>
           <option value="Manager">Manager</option>
         </select>
         <select id="newUserLocation" required class="border rounded-lg p-2 text-sm sm:col-span-2"></select>
@@ -478,14 +480,15 @@
 
     const fallbackUsers = [
       { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Manager', location: 'Juba' },
-      { id: '2', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
+      { id: '2', username: 'submanager', password: 'password123', display_name: 'Assistant Manager', role: 'Lower Level Manager', location: 'Juba' },
+      { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
     ];
 
     // Seed default sample data if completely empty
     const sampleItems = [
-      { id: 'item-101', item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', opening: 50, added: 20, issues: 5, cost_price: 18.00, selling_price: 24.00, location: 'Juba', comments: 'Main Stock' },
-      { id: 'item-102', item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', opening: 40, added: 10, issues: 8, cost_price: 9.50, selling_price: 12.50, location: 'Juba', comments: 'Fresh arrival' },
-      { id: 'item-103', item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', opening: 100, added: 0, issues: 15, cost_price: 12.00, selling_price: 18.00, location: 'Juba', comments: 'Cold store' }
+      { id: 'item-101', item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', opening: 50, added: 20, issues: 5, cost_price: 18.00, selling_price: 24.00, location: 'Juba', comments: 'Main Stock', updated_at: new Date().toISOString() },
+      { id: 'item-102', item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', opening: 40, added: 10, issues: 8, cost_price: 9.50, selling_price: 12.50, location: 'Juba', comments: 'Fresh arrival', updated_at: new Date().toISOString() },
+      { id: 'item-103', item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', opening: 100, added: 0, issues: 15, cost_price: 12.00, selling_price: 18.00, location: 'Juba', comments: 'Cold store', updated_at: new Date().toISOString() }
     ];
 
     // Cache management using idb-keyval (12-hour offline persistence)
@@ -555,11 +558,13 @@
       const itemLocSelect = document.getElementById('itemTargetLocation');
       const transferFrom = document.getElementById('transferFromLoc');
       const transferTo = document.getElementById('transferToLoc');
+      const newUserLoc = document.getElementById('newUserLocation');
 
       if (locSelect) locSelect.innerHTML = availableDepots.map(d => `<option value="${d}" ${d===currentStoreLocation?'selected':''}>${d} Depot</option>`).join('');
       if (itemLocSelect) itemLocSelect.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
       if (transferFrom) transferFrom.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
       if (transferTo) transferTo.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+      if (newUserLoc) newUserLoc.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
     }
 
     // Load inventory items from Supabase or IndexedDB Cache
@@ -576,7 +581,7 @@
       const printDateValue = document.getElementById('printDateValue');
       const printLocationName = document.getElementById('printLocationName');
 
-      if (dayLabel) dayLabel.textContent = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (dayLabel) dayLabel.textContent = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
       if (printDateValue) printDateValue.textContent = selectedDate;
       if (printLocationName) printLocationName.textContent = currentStoreLocation;
 
@@ -631,10 +636,14 @@
       }
       if (emptyState) emptyState.classList.add('hidden');
 
+      const isStorekeeperOnly = currentUser && currentUser.role === 'Storekeeper';
+
       filtered.forEach(item => {
         const closing = (Number(item.opening) || 0) + (Number(item.added) || 0) - (Number(item.issues) || 0);
         const rev = (Number(item.issues) || 0) * (Number(item.selling_price) || 0);
         const isChecked = selectedItemIds.has(item.id);
+
+        const timeString = item.updated_at ? new Date(item.updated_at).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', month: 'short', day: 'numeric' }) : '--';
 
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
@@ -651,10 +660,11 @@
           <td class="p-3 text-right text-slate-500">$${(Number(item.cost_price)||0).toFixed(2)}</td>
           <td class="p-3 text-right font-semibold text-slate-700">$${(Number(item.selling_price)||0).toFixed(2)}</td>
           <td class="p-3 text-right font-bold text-emerald-600">$${rev.toFixed(2)}</td>
+          <td class="p-3 text-slate-500 text-[11px] font-mono"><i class="fa-regular fa-clock mr-1 text-slate-400"></i>${timeString}</td>
           <td class="p-3 text-slate-400 max-w-[150px] truncate">${item.comments || '--'}</td>
           <td class="p-3 text-center">
-            <button onclick="editItem('${item.id}')" class="bg-slate-100 hover:bg-brand-50 hover:text-brand-600 p-1.5 rounded-lg text-slate-600 transition" title="Edit Item"><i class="fa-solid fa-pen-to-square"></i></button>
-            <button onclick="deleteSingleItem('${item.id}')" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 p-1.5 rounded-lg text-slate-600 transition ml-1" title="Delete Item"><i class="fa-solid fa-trash"></i></button>
+            <button onclick="editItem('${item.id}')" class="bg-slate-100 hover:bg-brand-50 hover:text-brand-600 p-1.5 rounded-lg text-slate-600 transition" title="Edit Quantities"><i class="fa-solid fa-pen-to-square"></i></button>
+            ${!isStorekeeperOnly ? `<button onclick="deleteSingleItem('${item.id}')" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 p-1.5 rounded-lg text-slate-600 transition ml-1" title="Delete Item"><i class="fa-solid fa-trash"></i></button>` : ''}
           </td>
         `;
         tbody.appendChild(tr);
@@ -701,7 +711,7 @@
       const btn = document.getElementById('batchDeleteBtn');
       const countSpan = document.getElementById('selectedCount');
       if (btn && countSpan) {
-        if (selectedItemIds.size > 0) {
+        if (selectedItemIds.size > 0 && currentUser && currentUser.role !== 'Storekeeper') {
           btn.classList.remove('hidden');
           countSpan.textContent = selectedItemIds.size;
         } else {
@@ -723,6 +733,10 @@
 
     document.getElementById('batchDeleteBtn')?.addEventListener('click', async () => {
       if (selectedItemIds.size === 0) return;
+      if (currentUser?.role === 'Storekeeper') {
+        alert("Storekeepers do not have permission to delete items.");
+        return;
+      }
       if (!confirm(`Are you sure you want to delete ${selectedItemIds.size} selected items?`)) return;
 
       const idsToDelete = Array.from(selectedItemIds);
@@ -746,6 +760,10 @@
     });
 
     window.deleteSingleItem = async function(id) {
+      if (currentUser?.role === 'Storekeeper') {
+        alert("Storekeepers do not have permission to delete items.");
+        return;
+      }
       if (!confirm("Delete this inventory record?")) return;
       inventoryItems = inventoryItems.filter(i => i.id !== id);
       selectedItemIds.delete(id);
@@ -795,7 +813,19 @@
       if (itemCost) itemCost.value = item.cost_price;
       if (itemPrice) itemPrice.value = item.selling_price;
       if (itemComments) itemComments.value = item.comments || '';
-      if (deleteItemBtn) deleteItemBtn.classList.remove('hidden');
+
+      // Access restriction for master data vs quantities
+      const isMasterEditable = currentUser && currentUser.role === 'Manager';
+      if (itemDescription) itemDescription.disabled = !isMasterEditable;
+      if (itemCategory) itemCategory.disabled = !isMasterEditable;
+      if (itemSpec) itemSpec.disabled = !isMasterEditable;
+      if (itemCost) itemCost.disabled = !isMasterEditable;
+      if (itemPrice) itemPrice.disabled = !isMasterEditable;
+
+      if (deleteItemBtn) {
+        if (currentUser && currentUser.role !== 'Storekeeper') deleteItemBtn.classList.remove('hidden');
+        else deleteItemBtn.classList.add('hidden');
+      }
 
       const modal = document.getElementById('itemModal');
       if (modal) {
@@ -817,6 +847,12 @@
       if (originalItemCode) originalItemCode.value = "";
       if (itemId) itemId.value = "ITEM-" + Math.floor(1000 + Math.random() * 9000);
       if (deleteItemBtn) deleteItemBtn.classList.add('hidden');
+
+      const isMasterEditable = currentUser && currentUser.role === 'Manager';
+      ['itemDescription', 'itemCategory', 'itemSpec', 'itemCost', 'itemPrice'].forEach(f => {
+        const el = document.getElementById(f);
+        if (el) el.disabled = !isMasterEditable;
+      });
 
       const modal = document.getElementById('itemModal');
       if (modal) {
@@ -841,6 +877,8 @@
       const origId = document.getElementById('originalItemCode') ? document.getElementById('originalItemCode').value : "";
       const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
 
+      const nowStamp = new Date().toISOString();
+
       const payload = {
         id: origId || ("item-" + Date.now()),
         item_code: document.getElementById('itemId') ? document.getElementById('itemId').value : "",
@@ -854,7 +892,8 @@
         selling_price: Number(document.getElementById('itemPrice') ? document.getElementById('itemPrice').value : 0) || 0,
         comments: document.getElementById('itemComments') ? document.getElementById('itemComments').value : "",
         location: currentStoreLocation,
-        record_date: selectedDate
+        record_date: selectedDate,
+        updated_at: nowStamp
       };
 
       if (origId) {
@@ -872,11 +911,117 @@
 
       if (isOnline && supabaseClient) {
         await supabaseClient.from('inventory').upsert(payload);
-        showSaveStatus("Saved & Synced");
+        showSaveStatus("Saved & Synced (" + new Date().toLocaleTimeString() + ")");
       } else {
         await queueOfflineChange('upsert', payload);
         showSaveStatus("Saved to 12h Offline Cache");
       }
+    });
+
+    // --- Functional Fixes: Template, Excel Upload, Backup, Restore, Reset ---
+    document.getElementById('downloadTemplateBtn')?.addEventListener('click', () => {
+      const templateData = [
+        { "Item Code": "DRY-01", "Description": "Sample Rice 25kg", "Category": "Dry Food Items", "Unit": "Bag", "Opening": 50, "Added": 10, "Issues": 5, "Cost Price": 15.00, "Selling Price": 20.00, "Comments": "Sample row" }
+      ];
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Master Template");
+      XLSX.writeFile(wb, "GAS_Inventory_Master_Template.xlsx");
+    });
+
+    document.getElementById('uploadExcelInput')?.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+          const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+
+          let importedCount = 0;
+          rows.forEach((r) => {
+            const newItem = {
+              id: "item-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+              item_code: r["Item Code"] || r["item_code"] || ("ITEM-" + Math.floor(Math.random() * 9000)),
+              description: r["Description"] || r["description"] || "Imported Item",
+              category: r["Category"] || r["category"] || "Dry Food Items",
+              unit: r["Unit"] || r["unit"] || "Pcs",
+              opening: Number(r["Opening"] || r["opening"] || 0),
+              added: Number(r["Added"] || r["added"] || 0),
+              issues: Number(r["Issues"] || r["issues"] || 0),
+              cost_price: Number(r["Cost Price"] || r["cost_price"] || 0),
+              selling_price: Number(r["Selling Price"] || r["selling_price"] || 0),
+              comments: r["Comments"] || r["comments"] || "Excel Imported",
+              location: currentStoreLocation,
+              record_date: selectedDate,
+              updated_at: new Date().toISOString()
+            };
+            inventoryItems.unshift(newItem);
+            importedCount++;
+          });
+
+          renderTable();
+          updateKPIs();
+          await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+          showSaveStatus(`Imported ${importedCount} items`);
+          alert(`Successfully imported ${importedCount} inventory items!`);
+        } catch (err) {
+          alert("Error parsing Excel file: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    document.getElementById('backupBtn')?.addEventListener('click', () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(inventoryItems, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : 'backup';
+      downloadAnchor.setAttribute("download", `GAS_Backup_${currentStoreLocation}_${selectedDate}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    });
+
+    document.getElementById('restoreInput')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const restored = JSON.parse(evt.target.result);
+          if (Array.isArray(restored)) {
+            inventoryItems = restored;
+            renderTable();
+            updateKPIs();
+            const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+            await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+            alert("Inventory backup restored successfully!");
+          }
+        } catch (err) {
+          alert("Invalid backup JSON file.");
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    document.getElementById('resetStockBtn')?.addEventListener('click', async () => {
+      if (!confirm("Are you sure you want to reset (zero out) Opening, Added, and Issues for all items on this date?")) return;
+      const nowStamp = new Date().toISOString();
+      inventoryItems.forEach(i => {
+        i.opening = 0;
+        i.added = 0;
+        i.issues = 0;
+        i.updated_at = nowStamp;
+      });
+      renderTable();
+      updateKPIs();
+      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+      showSaveStatus("Stock quantities reset to 0");
     });
 
     // Toolbar Button Safe Handlers
@@ -956,10 +1101,10 @@
 
     // Export CSV
     document.getElementById('exportBtn')?.addEventListener('click', () => {
-      let csv = "Item Code,Description,Category,Unit,Opening,Added,Issues,Closing,Cost Price,Sale Price,Comments\n";
+      let csv = "Item Code,Description,Category,Unit,Opening,Added,Issues,Closing,Cost Price,Sale Price,Last Updated,Comments\n";
       inventoryItems.forEach(i => {
         const closing = (Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0);
-        csv += `"${i.item_code}","${i.description}","${i.category}","${i.unit}",${i.opening},${i.added},${i.issues},${closing},${i.cost_price},${i.selling_price},"${i.comments||''}"\n`;
+        csv += `"${i.item_code}","${i.description}","${i.category}","${i.unit}",${i.opening},${i.added},${i.issues},${closing},${i.cost_price},${i.selling_price},"${i.updated_at||''}" "${i.comments||''}"\n`;
       });
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
@@ -1015,7 +1160,7 @@
       }
     });
 
-    // Successful login session handler
+    // Role Permission Engine & Login Handler
     function loginSuccess(user) {
       currentUser = user;
       currentStoreLocation = user.location || "Juba";
@@ -1036,19 +1181,32 @@
 
       renderDepotDropdowns();
 
-      // Show Manager & Action Options
-      if (user.role === 'Manager' || user.role === 'Storekeeper') {
+      // Configure Permissions according to Role:
+      // Storekeeper: Print reports, view, and edit daily quantities (opening, added, issues).
+      // Lower Level Manager: View, edit quantities, print reports, transfer stock, requisitions.
+      // Manager: Full access (create accounts, master template, restore/backup, delete items).
+
+      const isStorekeeper = user.role === 'Storekeeper';
+      const isSubManager = user.role === 'Lower Level Manager';
+      const isFullManager = user.role === 'Manager';
+
+      // Daily items & printing available for everyone
+      document.getElementById('newItemBtn')?.classList.remove('hidden');
+      document.getElementById('managerLocationBox')?.classList.remove('hidden');
+      document.getElementById('managerLocationBox')?.classList.add('flex');
+
+      if (isSubManager || isFullManager) {
         document.getElementById('transferBtn')?.classList.remove('hidden');
         document.getElementById('auditReportBtn')?.classList.remove('hidden');
+      }
+
+      if (isFullManager) {
         document.getElementById('manageUsersBtn')?.classList.remove('hidden');
         document.getElementById('downloadTemplateBtn')?.classList.remove('hidden');
         document.getElementById('uploadExcelLabel')?.classList.remove('hidden');
         document.getElementById('backupBtn')?.classList.remove('hidden');
         document.getElementById('restoreLabel')?.classList.remove('hidden');
         document.getElementById('resetStockBtn')?.classList.remove('hidden');
-        document.getElementById('newItemBtn')?.classList.remove('hidden');
-        document.getElementById('managerLocationBox')?.classList.remove('hidden');
-        document.getElementById('managerLocationBox')?.classList.add('flex');
       }
 
       // Hide Login Modal & load dataset
