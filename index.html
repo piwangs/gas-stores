@@ -134,6 +134,16 @@
     </div>
 
     <!-- Date & Location Selector Bar -->
+    <section class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-2 flex-wrap">
+        <label for="selectedDate" class="text-xs font-bold text-slate-600 flex items-center gap-1">
+          <i class="fa-solid fa-calendar-days text-brand-600 text-sm"></i> Operational Date:
+        </label>
+        <button id="prevDateBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition" title="Previous Day"><i class="fa-solid fa-chevron-left"></i></button>
+        <input type="date" id="selectedDate" class="bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold p-1.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+        <button id="nextDateBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition" title="Next Day"><i class="fa-solid fa-chevron-right"></i></button>
+        <button id="todayBtn" type="button" class="bg-brand-50 hover:bg-brand-100 text-brand-700 px-3 py-1.5 rounded-lg text-xs font-bold transition">Today</button>
+      </div>
       <div id="managerLocationBox" class="flex items-center gap-2">
         <label for="locationSelector" class="text-xs font-semibold text-slate-500">Active Depot Node:</label>
         <select id="locationSelector" class="bg-slate-50 border border-slate-300 rounded-lg text-xs p-2 font-semibold text-slate-800 focus:ring-brand-500">
@@ -194,7 +204,6 @@
               <th class="p-3 text-right">Cost Price</th>
               <th class="p-3 text-right">Sale Price</th>
               <th class="p-3 text-right">Est. Revenue</th>
-              <th class="p-3">Updated Timestamp</th>
               <th class="p-3">Comments</th>
               <th class="p-3 text-center">Actions</th>
             </tr>
@@ -417,8 +426,8 @@
         <input id="newPassword" required minlength="8" type="password" autocomplete="new-password" placeholder="Password (8+ chars)" class="border rounded-lg p-2 text-sm">
         <select id="newUserRole" required class="border rounded-lg p-2 text-sm font-semibold">
           <option value="Storekeeper">Storekeeper</option>
-          <option value="Lower Level Manager">Lower Level Manager</option>
           <option value="Manager">Manager</option>
+          <option value="Admin">Admin (Full Rights)</option>
         </select>
         <select id="newUserLocation" required class="border rounded-lg p-2 text-sm sm:col-span-2"></select>
         <button type="submit" class="sm:col-span-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-2 font-semibold text-sm shadow-md">Create Account</button>
@@ -479,8 +488,8 @@
     const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 Hours offline storage window
 
     const fallbackUsers = [
-      { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Manager', location: 'Juba' },
-      { id: '2', username: 'submanager', password: 'password123', display_name: 'Assistant Manager', role: 'Lower Level Manager', location: 'Juba' },
+      { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Admin', location: 'Juba' },
+      { id: '2', username: 'manager', password: 'password123', display_name: 'Store Manager', role: 'Manager', location: 'Juba' },
       { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
     ];
 
@@ -643,8 +652,6 @@
         const rev = (Number(item.issues) || 0) * (Number(item.selling_price) || 0);
         const isChecked = selectedItemIds.has(item.id);
 
-        const timeString = item.updated_at ? new Date(item.updated_at).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', month: 'short', day: 'numeric' }) : '--';
-
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
         tr.innerHTML = `
@@ -660,11 +667,10 @@
           <td class="p-3 text-right text-slate-500">$${(Number(item.cost_price)||0).toFixed(2)}</td>
           <td class="p-3 text-right font-semibold text-slate-700">$${(Number(item.selling_price)||0).toFixed(2)}</td>
           <td class="p-3 text-right font-bold text-emerald-600">$${rev.toFixed(2)}</td>
-          <td class="p-3 text-slate-500 text-[11px] font-mono"><i class="fa-regular fa-clock mr-1 text-slate-400"></i>${timeString}</td>
           <td class="p-3 text-slate-400 max-w-[150px] truncate">${item.comments || '--'}</td>
           <td class="p-3 text-center">
             <button onclick="editItem('${item.id}')" class="bg-slate-100 hover:bg-brand-50 hover:text-brand-600 p-1.5 rounded-lg text-slate-600 transition" title="Edit Quantities"><i class="fa-solid fa-pen-to-square"></i></button>
-            ${!isStorekeeperOnly ? `<button onclick="deleteSingleItem('${item.id}')" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 p-1.5 rounded-lg text-slate-600 transition ml-1" title="Delete Item"><i class="fa-solid fa-trash"></i></button>` : ''}
+            ${currentUser && currentUser.role === 'Admin' ? `<button onclick="deleteSingleItem('${item.id}')" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 p-1.5 rounded-lg text-slate-600 transition ml-1" title="Delete Item"><i class="fa-solid fa-trash"></i></button>` : ''}
           </td>
         `;
         tbody.appendChild(tr);
@@ -815,7 +821,7 @@
       if (itemComments) itemComments.value = item.comments || '';
 
       // Access restriction for master data vs quantities
-      const isMasterEditable = currentUser && currentUser.role === 'Manager';
+      const isMasterEditable = currentUser && currentUser.role === 'Admin';
       if (itemDescription) itemDescription.disabled = !isMasterEditable;
       if (itemCategory) itemCategory.disabled = !isMasterEditable;
       if (itemSpec) itemSpec.disabled = !isMasterEditable;
@@ -823,7 +829,7 @@
       if (itemPrice) itemPrice.disabled = !isMasterEditable;
 
       if (deleteItemBtn) {
-        if (currentUser && currentUser.role !== 'Storekeeper') deleteItemBtn.classList.remove('hidden');
+        if (currentUser && currentUser.role === 'Admin') deleteItemBtn.classList.remove('hidden');
         else deleteItemBtn.classList.add('hidden');
       }
 
@@ -1183,30 +1189,40 @@
 
       // Configure Permissions according to Role:
       // Storekeeper: Print reports, view, and edit daily quantities (opening, added, issues).
-      // Lower Level Manager: View, edit quantities, print reports, transfer stock, requisitions.
-      // Manager: Full access (create accounts, master template, restore/backup, delete items).
+      // Manager: View, edit quantities, print reports, transfer stock, requisitions, audit reports.
+      // Admin: Full access (create accounts, master template, restore/backup, delete items, reset stock).
 
       const isStorekeeper = user.role === 'Storekeeper';
-      const isSubManager = user.role === 'Lower Level Manager';
-      const isFullManager = user.role === 'Manager';
+      const isManager = user.role === 'Manager';
+      const isAdmin = user.role === 'Admin';
 
       // Daily items & printing available for everyone
       document.getElementById('newItemBtn')?.classList.remove('hidden');
       document.getElementById('managerLocationBox')?.classList.remove('hidden');
       document.getElementById('managerLocationBox')?.classList.add('flex');
 
-      if (isSubManager || isFullManager) {
+      if (isManager || isAdmin) {
         document.getElementById('transferBtn')?.classList.remove('hidden');
         document.getElementById('auditReportBtn')?.classList.remove('hidden');
+      } else {
+        document.getElementById('transferBtn')?.classList.add('hidden');
+        document.getElementById('auditReportBtn')?.classList.add('hidden');
       }
 
-      if (isFullManager) {
+      if (isAdmin) {
         document.getElementById('manageUsersBtn')?.classList.remove('hidden');
         document.getElementById('downloadTemplateBtn')?.classList.remove('hidden');
         document.getElementById('uploadExcelLabel')?.classList.remove('hidden');
         document.getElementById('backupBtn')?.classList.remove('hidden');
         document.getElementById('restoreLabel')?.classList.remove('hidden');
         document.getElementById('resetStockBtn')?.classList.remove('hidden');
+      } else {
+        document.getElementById('manageUsersBtn')?.classList.add('hidden');
+        document.getElementById('downloadTemplateBtn')?.classList.add('hidden');
+        document.getElementById('uploadExcelLabel')?.classList.add('hidden');
+        document.getElementById('backupBtn')?.classList.add('hidden');
+        document.getElementById('restoreLabel')?.classList.add('hidden');
+        document.getElementById('resetStockBtn')?.classList.add('hidden');
       }
 
       // Hide Login Modal & load dataset
