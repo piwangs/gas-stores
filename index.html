@@ -134,16 +134,16 @@
     </div>
 
     <!-- Date & Location Selector Bar -->
-    <section class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
-      <div class="flex items-center gap-2 flex-wrap">
-        <button id="prevDateBtn" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm font-semibold transition"><i class="fa-solid fa-chevron-left"></i></button>
-        <div class="flex items-center gap-2"><i class="fa-solid fa-calendar-day text-brand-600"></i><input type="date" id="selectedDate" class="bg-slate-50 border border-slate-300 rounded-lg text-sm font-bold p-2 focus:ring-brand-500"></div>
-        <button id="nextDateBtn" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm font-semibold transition"><i class="fa-solid fa-chevron-right"></i></button>
-        <button id="todayBtn" class="bg-brand-50 hover:bg-brand-100 text-brand-700 px-3 py-2 rounded-lg text-xs font-bold transition">Today</button>
-      </div>
-      <div id="managerLocationBox" class="hidden items-center gap-2">
+      <div id="managerLocationBox" class="flex items-center gap-2">
         <label for="locationSelector" class="text-xs font-semibold text-slate-500">Active Depot Node:</label>
-        <select id="locationSelector" class="bg-slate-50 border border-slate-300 rounded-lg text-xs p-2 font-semibold text-slate-800 focus:ring-brand-500"></select>
+        <select id="locationSelector" class="bg-slate-50 border border-slate-300 rounded-lg text-xs p-2 font-semibold text-slate-800 focus:ring-brand-500">
+          <option value="Juba">Juba Depot</option>
+          <option value="Tomping">Tomping Depot</option>
+          <option value="UNHOUSE">UNHOUSE Depot</option>
+          <option value="WAU">WAU Depot</option>
+          <option value="YAMBIO">YAMBIO Depot</option>
+          <option value="Bentiu">Bentiu Depot</option>
+        </select>
       </div>
       <div class="flex items-center gap-3">
         <span id="dayLabel" class="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">--</span>
@@ -172,7 +172,7 @@
       </div>
       <div class="flex items-center gap-2">
         <input id="searchInput" type="search" placeholder="Search item..." class="w-full md:w-64 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
-        <button id="batchDeleteBtn" type="button" class="hidden bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-trash mr-1"></i>Delete Selected</button>
+        <button id="batchDeleteBtn" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition"><i class="fa-solid fa-trash mr-1"></i>Delete Selected (<span id="selectedCount">0</span>)</button>
       </div>
     </section>
 
@@ -434,20 +434,38 @@
     const SUPABASE_URL = "https://chfpcwlpmzcyorifzpja.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZnBjd2xwbXpjeW9yaWZ6cGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwMjE5MzEsImV4cCI6MjEwOTU5NzkzMX0.73G3XXghDxrwVxbDibXemM5LB57LHUZdw4nK_Nc4lLo";
     let supabaseClient = null;
+    let isOnline = navigator.onLine;
 
-    // Helper to initialize Supabase
+    // Default depots list
+    let availableDepots = ["Juba", "Tomping", "UNHOUSE", "WAU", "YAMBIO", "Bentiu"];
+
+    function updateNetworkStatus() {
+      isOnline = navigator.onLine;
+      const badge = document.getElementById('connectionBadge');
+      if (badge) {
+        if (isOnline) {
+          badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700";
+          badge.innerHTML = '<i class="fa-solid fa-wifi mr-1"></i>Online (Cloud)';
+          syncOfflineQueue();
+        } else {
+          badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-700";
+          badge.innerHTML = '<i class="fa-solid fa-plane-slash mr-1"></i>Offline Mode (12h Cache)';
+        }
+      }
+    }
+
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+
     function initSupabase() {
       try {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        document.getElementById('connectionBadge').className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700";
-        document.getElementById('connectionBadge').innerHTML = '<i class="fa-solid fa-wifi mr-1"></i>Cloud Connected';
-        return true;
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
       } catch (err) {
-        console.error("Supabase init failed:", err);
-        document.getElementById('connectionBadge').className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-rose-100 text-rose-700";
-        document.getElementById('connectionBadge').innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>Offline / Local Mode';
-        return false;
+        console.error("Supabase init error:", err);
       }
+      updateNetworkStatus();
     }
 
     initSupabase();
@@ -455,12 +473,547 @@
     let currentUser = null;
     let currentStoreLocation = "Juba";
     let inventoryItems = [];
+    let selectedItemIds = new Set();
+    const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 Hours offline storage window
 
-    // Fallback accounts when database tables are empty or network/CORS restricts queries
     const fallbackUsers = [
       { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Manager', location: 'Juba' },
       { id: '2', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
     ];
+
+    // Seed default sample data if completely empty
+    const sampleItems = [
+      { id: 'item-101', item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', opening: 50, added: 20, issues: 5, cost_price: 18.00, selling_price: 24.00, location: 'Juba', comments: 'Main Stock' },
+      { id: 'item-102', item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', opening: 40, added: 10, issues: 8, cost_price: 9.50, selling_price: 12.50, location: 'Juba', comments: 'Fresh arrival' },
+      { id: 'item-103', item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', opening: 100, added: 0, issues: 15, cost_price: 12.00, selling_price: 18.00, location: 'Juba', comments: 'Cold store' }
+    ];
+
+    // Cache management using idb-keyval (12-hour offline persistence)
+    async function getCachedInventory(location, dateStr) {
+      try {
+        if (typeof idbKeyval !== 'undefined') {
+          const key = `inventory_${location}_${dateStr}`;
+          const cacheObj = await idbKeyval.get(key);
+          if (cacheObj && (Date.now() - cacheObj.timestamp < CACHE_TTL_MS)) {
+            return cacheObj.data;
+          }
+        }
+      } catch (e) { console.warn("Cache load error:", e); }
+      return null;
+    }
+
+    async function setCachedInventory(location, dateStr, data) {
+      try {
+        if (typeof idbKeyval !== 'undefined') {
+          const key = `inventory_${location}_${dateStr}`;
+          await idbKeyval.set(key, { timestamp: Date.now(), data });
+        }
+      } catch (e) { console.warn("Cache save error:", e); }
+    }
+
+    async function queueOfflineChange(action, payload) {
+      try {
+        if (typeof idbKeyval !== 'undefined') {
+          const queue = (await idbKeyval.get('offline_sync_queue')) || [];
+          queue.push({ action, payload, timestamp: Date.now() });
+          await idbKeyval.set('offline_sync_queue', queue);
+        }
+      } catch (e) { console.warn("Offline queue error:", e); }
+    }
+
+    async function syncOfflineQueue() {
+      if (!isOnline || !supabaseClient || typeof idbKeyval === 'undefined') return;
+      try {
+        const queue = (await idbKeyval.get('offline_sync_queue')) || [];
+        if (queue.length === 0) return;
+
+        showSaveStatus("Syncing offline changes...");
+        for (const item of queue) {
+          if (item.action === 'upsert') {
+            await supabaseClient.from('inventory').upsert(item.payload);
+          } else if (item.action === 'delete') {
+            await supabaseClient.from('inventory').delete().in('id', item.payload);
+          }
+        }
+        await idbKeyval.set('offline_sync_queue', []);
+        showSaveStatus("Offline queue synced!");
+      } catch (e) { console.warn("Sync queue failed:", e); }
+    }
+
+    function showSaveStatus(msg = "Synced") {
+      const el = document.getElementById('saveStatus');
+      if (el) {
+        el.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-1"></i>${msg}`;
+        el.classList.remove('opacity-0');
+        setTimeout(() => el.classList.add('opacity-0'), 2500);
+      }
+    }
+
+    // Populate Depot dropdowns safely
+    function renderDepotDropdowns() {
+      const locSelect = document.getElementById('locationSelector');
+      const itemLocSelect = document.getElementById('itemTargetLocation');
+      const transferFrom = document.getElementById('transferFromLoc');
+      const transferTo = document.getElementById('transferToLoc');
+
+      if (locSelect) locSelect.innerHTML = availableDepots.map(d => `<option value="${d}" ${d===currentStoreLocation?'selected':''}>${d} Depot</option>`).join('');
+      if (itemLocSelect) itemLocSelect.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+      if (transferFrom) transferFrom.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+      if (transferTo) transferTo.innerHTML = availableDepots.map(d => `<option value="${d}">${d} Depot</option>`).join('');
+    }
+
+    // Load inventory items from Supabase or IndexedDB Cache
+    async function loadInventory() {
+      const selectedDateEl = document.getElementById('selectedDate');
+      const locationSelectEl = document.getElementById('locationSelector');
+      
+      const selectedDate = selectedDateEl ? selectedDateEl.value : new Date().toISOString().split('T')[0];
+      currentStoreLocation = locationSelectEl ? (locationSelectEl.value || "Juba") : "Juba";
+      
+      // Update Day Label & Header info safely
+      const dt = new Date(selectedDate);
+      const dayLabel = document.getElementById('dayLabel');
+      const printDateValue = document.getElementById('printDateValue');
+      const printLocationName = document.getElementById('printLocationName');
+
+      if (dayLabel) dayLabel.textContent = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (printDateValue) printDateValue.textContent = selectedDate;
+      if (printLocationName) printLocationName.textContent = currentStoreLocation;
+
+      // Try local cache first for instant rendering
+      let loadedData = await getCachedInventory(currentStoreLocation, selectedDate);
+
+      if (isOnline && supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient
+            .from('inventory')
+            .select('*')
+            .eq('location', currentStoreLocation)
+            .eq('record_date', selectedDate);
+
+          if (!error && data) {
+            loadedData = data.length > 0 ? data : (loadedData || sampleItems.filter(i => i.location === currentStoreLocation));
+            await setCachedInventory(currentStoreLocation, selectedDate, loadedData);
+          }
+        } catch (e) {
+          console.warn("Supabase fetch failed, fallback to cache:", e);
+        }
+      }
+
+      if (!loadedData || loadedData.length === 0) {
+        loadedData = sampleItems.filter(i => i.location === currentStoreLocation);
+      }
+
+      inventoryItems = loadedData;
+      renderTable();
+      updateKPIs();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      if (!tbody) return;
+
+      const searchVal = document.getElementById('searchInput') ? document.getElementById('searchInput').value.toLowerCase() : '';
+      const activeCatBtn = document.querySelector('#categoryFilter .bg-brand-600');
+      const catVal = activeCatBtn ? activeCatBtn.dataset.category : "All";
+
+      const filtered = inventoryItems.filter(item => {
+        const matchesSearch = (item.description || '').toLowerCase().includes(searchVal) || (item.item_code || '').toLowerCase().includes(searchVal);
+        const matchesCat = (catVal === 'All' || item.category === catVal);
+        return matchesSearch && matchesCat;
+      });
+
+      tbody.innerHTML = '';
+      const emptyState = document.getElementById('emptyState');
+      if (filtered.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        return;
+      }
+      if (emptyState) emptyState.classList.add('hidden');
+
+      filtered.forEach(item => {
+        const closing = (Number(item.opening) || 0) + (Number(item.added) || 0) - (Number(item.issues) || 0);
+        const rev = (Number(item.issues) || 0) * (Number(item.selling_price) || 0);
+        const isChecked = selectedItemIds.has(item.id);
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+        tr.innerHTML = `
+          <td class="p-3 text-center"><input type="checkbox" class="item-checkbox rounded" data-id="${item.id}" ${isChecked?'checked':''}></td>
+          <td class="p-3 font-mono font-bold text-slate-700">${item.item_code || 'N/A'}</td>
+          <td class="p-3 font-semibold text-slate-900">${item.description}</td>
+          <td class="p-3"><span class="px-2 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">${item.category}</span></td>
+          <td class="p-3 text-center">${item.unit}</td>
+          <td class="p-3 text-center font-semibold text-slate-700">${item.opening || 0}</td>
+          <td class="p-3 text-center text-emerald-600 font-semibold">+${item.added || 0}</td>
+          <td class="p-3 text-center text-amber-600 font-semibold">-${item.issues || 0}</td>
+          <td class="p-3 text-center font-bold ${closing <= 5 ? 'text-rose-600 bg-rose-50 rounded-lg' : 'text-slate-800'}">${closing}</td>
+          <td class="p-3 text-right text-slate-500">$${(Number(item.cost_price)||0).toFixed(2)}</td>
+          <td class="p-3 text-right font-semibold text-slate-700">$${(Number(item.selling_price)||0).toFixed(2)}</td>
+          <td class="p-3 text-right font-bold text-emerald-600">$${rev.toFixed(2)}</td>
+          <td class="p-3 text-slate-400 max-w-[150px] truncate">${item.comments || '--'}</td>
+          <td class="p-3 text-center">
+            <button onclick="editItem('${item.id}')" class="bg-slate-100 hover:bg-brand-50 hover:text-brand-600 p-1.5 rounded-lg text-slate-600 transition" title="Edit Item"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="deleteSingleItem('${item.id}')" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 p-1.5 rounded-lg text-slate-600 transition ml-1" title="Delete Item"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Bind checkboxes
+      document.querySelectorAll('.item-checkbox').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const id = e.target.dataset.id;
+          if (e.target.checked) selectedItemIds.add(id);
+          else selectedItemIds.delete(id);
+          updateBatchDeleteButton();
+        });
+      });
+    }
+
+    function updateKPIs() {
+      let totalItems = inventoryItems.length;
+      let totalIssues = 0;
+      let dailyRevenue = 0;
+      let lowStock = 0;
+
+      inventoryItems.forEach(item => {
+        const issues = Number(item.issues) || 0;
+        const closing = (Number(item.opening) || 0) + (Number(item.added) || 0) - issues;
+        totalIssues += issues;
+        dailyRevenue += issues * (Number(item.selling_price) || 0);
+        if (closing <= 5) lowStock++;
+      });
+
+      const elItems = document.getElementById('statTotalItems');
+      const elIssues = document.getElementById('statTotalIssues');
+      const elRev = document.getElementById('statDailyRevenue');
+      const elLow = document.getElementById('statLowStock');
+
+      if (elItems) elItems.textContent = totalItems;
+      if (elIssues) elIssues.textContent = totalIssues;
+      if (elRev) elRev.textContent = `$${dailyRevenue.toFixed(2)}`;
+      if (elLow) elLow.textContent = lowStock;
+    }
+
+    // Batch Delete Logic
+    function updateBatchDeleteButton() {
+      const btn = document.getElementById('batchDeleteBtn');
+      const countSpan = document.getElementById('selectedCount');
+      if (btn && countSpan) {
+        if (selectedItemIds.size > 0) {
+          btn.classList.remove('hidden');
+          countSpan.textContent = selectedItemIds.size;
+        } else {
+          btn.classList.add('hidden');
+          countSpan.textContent = '0';
+        }
+      }
+    }
+
+    document.getElementById('selectAllItems')?.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        inventoryItems.forEach(i => selectedItemIds.add(i.id));
+      } else {
+        selectedItemIds.clear();
+      }
+      renderTable();
+      updateBatchDeleteButton();
+    });
+
+    document.getElementById('batchDeleteBtn')?.addEventListener('click', async () => {
+      if (selectedItemIds.size === 0) return;
+      if (!confirm(`Are you sure you want to delete ${selectedItemIds.size} selected items?`)) return;
+
+      const idsToDelete = Array.from(selectedItemIds);
+      inventoryItems = inventoryItems.filter(i => !selectedItemIds.has(i.id));
+      selectedItemIds.clear();
+
+      updateBatchDeleteButton();
+      renderTable();
+      updateKPIs();
+
+      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        await supabaseClient.from('inventory').delete().in('id', idsToDelete);
+        showSaveStatus("Items deleted");
+      } else {
+        await queueOfflineChange('delete', idsToDelete);
+        showSaveStatus("Queued deletion offline");
+      }
+    });
+
+    window.deleteSingleItem = async function(id) {
+      if (!confirm("Delete this inventory record?")) return;
+      inventoryItems = inventoryItems.filter(i => i.id !== id);
+      selectedItemIds.delete(id);
+      updateBatchDeleteButton();
+      renderTable();
+      updateKPIs();
+
+      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        await supabaseClient.from('inventory').delete().eq('id', id);
+        showSaveStatus("Deleted");
+      } else {
+        await queueOfflineChange('delete', [id]);
+        showSaveStatus("Queued offline");
+      }
+    };
+
+    window.editItem = function(id) {
+      const item = inventoryItems.find(i => i.id === id);
+      if (!item) return;
+
+      const modalTitle = document.getElementById('modalTitle');
+      const itemId = document.getElementById('itemId');
+      const originalItemCode = document.getElementById('originalItemCode');
+      const itemDescription = document.getElementById('itemDescription');
+      const itemCategory = document.getElementById('itemCategory');
+      const itemSpec = document.getElementById('itemSpec');
+      const itemOpening = document.getElementById('itemOpening');
+      const itemAdded = document.getElementById('itemAdded');
+      const itemIssues = document.getElementById('itemIssues');
+      const itemCost = document.getElementById('itemCost');
+      const itemPrice = document.getElementById('itemPrice');
+      const itemComments = document.getElementById('itemComments');
+      const deleteItemBtn = document.getElementById('deleteItemBtn');
+
+      if (modalTitle) modalTitle.textContent = "Edit Inventory Item";
+      if (itemId) itemId.value = item.item_code || item.id;
+      if (originalItemCode) originalItemCode.value = item.id;
+      if (itemDescription) itemDescription.value = item.description;
+      if (itemCategory) itemCategory.value = item.category;
+      if (itemSpec) itemSpec.value = item.unit;
+      if (itemOpening) itemOpening.value = item.opening;
+      if (itemAdded) itemAdded.value = item.added;
+      if (itemIssues) itemIssues.value = item.issues;
+      if (itemCost) itemCost.value = item.cost_price;
+      if (itemPrice) itemPrice.value = item.selling_price;
+      if (itemComments) itemComments.value = item.comments || '';
+      if (deleteItemBtn) deleteItemBtn.classList.remove('hidden');
+
+      const modal = document.getElementById('itemModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    };
+
+    // Modal Action Bindings & Item Creation
+    document.getElementById('newItemBtn')?.addEventListener('click', () => {
+      const modalTitle = document.getElementById('modalTitle');
+      const itemForm = document.getElementById('itemForm');
+      const originalItemCode = document.getElementById('originalItemCode');
+      const itemId = document.getElementById('itemId');
+      const deleteItemBtn = document.getElementById('deleteItemBtn');
+
+      if (modalTitle) modalTitle.textContent = "Add New Inventory Item";
+      if (itemForm) itemForm.reset();
+      if (originalItemCode) originalItemCode.value = "";
+      if (itemId) itemId.value = "ITEM-" + Math.floor(1000 + Math.random() * 9000);
+      if (deleteItemBtn) deleteItemBtn.classList.add('hidden');
+
+      const modal = document.getElementById('itemModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    });
+
+    const closeItemModal = () => {
+      const modal = document.getElementById('itemModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    };
+
+    document.getElementById('closeItemX')?.addEventListener('click', closeItemModal);
+    document.getElementById('cancelItemBtn')?.addEventListener('click', closeItemModal);
+
+    document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const origId = document.getElementById('originalItemCode') ? document.getElementById('originalItemCode').value : "";
+      const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+
+      const payload = {
+        id: origId || ("item-" + Date.now()),
+        item_code: document.getElementById('itemId') ? document.getElementById('itemId').value : "",
+        description: document.getElementById('itemDescription') ? document.getElementById('itemDescription').value : "",
+        category: document.getElementById('itemCategory') ? document.getElementById('itemCategory').value : "",
+        unit: document.getElementById('itemSpec') ? document.getElementById('itemSpec').value : "",
+        opening: Number(document.getElementById('itemOpening') ? document.getElementById('itemOpening').value : 0) || 0,
+        added: Number(document.getElementById('itemAdded') ? document.getElementById('itemAdded').value : 0) || 0,
+        issues: Number(document.getElementById('itemIssues') ? document.getElementById('itemIssues').value : 0) || 0,
+        cost_price: Number(document.getElementById('itemCost') ? document.getElementById('itemCost').value : 0) || 0,
+        selling_price: Number(document.getElementById('itemPrice') ? document.getElementById('itemPrice').value : 0) || 0,
+        comments: document.getElementById('itemComments') ? document.getElementById('itemComments').value : "",
+        location: currentStoreLocation,
+        record_date: selectedDate
+      };
+
+      if (origId) {
+        const idx = inventoryItems.findIndex(i => i.id === origId);
+        if (idx !== -1) inventoryItems[idx] = payload;
+      } else {
+        inventoryItems.unshift(payload);
+      }
+
+      renderTable();
+      updateKPIs();
+      closeItemModal();
+
+      await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
+
+      if (isOnline && supabaseClient) {
+        await supabaseClient.from('inventory').upsert(payload);
+        showSaveStatus("Saved & Synced");
+      } else {
+        await queueOfflineChange('upsert', payload);
+        showSaveStatus("Saved to 12h Offline Cache");
+      }
+    });
+
+    // Toolbar Button Safe Handlers
+    document.getElementById('reorderBtn')?.addEventListener('click', () => {
+      const lowItems = inventoryItems.filter(i => ((Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0)) <= 5);
+      const list = document.getElementById('reorderItemsList');
+      if (list) {
+        if (lowItems.length === 0) {
+          list.innerHTML = `<p class="text-slate-500 text-center py-4">All stock levels are optimal!</p>`;
+        } else {
+          list.innerHTML = lowItems.map(i => `
+            <div class="flex justify-between items-center p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+              <div><p class="font-bold text-slate-800">${i.description}</p><p class="text-[10px] text-slate-500">ID: ${i.item_code} | Cat: ${i.category}</p></div>
+              <span class="font-bold text-rose-600 bg-white px-2 py-1 rounded shadow-sm">Rem: ${(Number(i.opening)||0)+(Number(i.added)||0)-(Number(i.issues)||0)} ${i.unit}</span>
+            </div>
+          `).join('');
+        }
+      }
+      const modal = document.getElementById('reorderModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    });
+
+    document.getElementById('closeReorderX')?.addEventListener('click', () => document.getElementById('reorderModal')?.classList.add('hidden'));
+    document.getElementById('closeReorderBtn')?.addEventListener('click', () => document.getElementById('reorderModal')?.classList.add('hidden'));
+
+    document.getElementById('transferBtn')?.addEventListener('click', () => {
+      const sel = document.getElementById('transferItemCode');
+      if (sel) sel.innerHTML = inventoryItems.map(i => `<option value="${i.id}">${i.description} (${i.item_code})</option>`).join('');
+      const dt = document.getElementById('transferDate');
+      if (dt) dt.valueAsDate = new Date();
+      const modal = document.getElementById('transferModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    });
+    document.getElementById('closeTransferX')?.addEventListener('click', () => document.getElementById('transferModal')?.classList.add('hidden'));
+    document.getElementById('cancelTransferBtn')?.addEventListener('click', () => document.getElementById('transferModal')?.classList.add('hidden'));
+
+    document.getElementById('requestBtn')?.addEventListener('click', () => {
+      const sel = document.getElementById('reqItemCode');
+      if (sel) sel.innerHTML = inventoryItems.map(i => `<option value="${i.id}">${i.description} (${i.item_code})</option>`).join('');
+      const modal = document.getElementById('requestModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    });
+    document.getElementById('closeRequestX')?.addEventListener('click', () => document.getElementById('requestModal')?.classList.add('hidden'));
+
+    document.getElementById('auditReportBtn')?.addEventListener('click', () => {
+      const s = document.getElementById('auditStart');
+      const e = document.getElementById('auditEnd');
+      if (s) s.valueAsDate = new Date();
+      if (e) e.valueAsDate = new Date();
+      const modal = document.getElementById('auditReportModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    });
+    document.getElementById('closeAuditX')?.addEventListener('click', () => document.getElementById('auditReportModal')?.classList.add('hidden'));
+
+    document.getElementById('manageUsersBtn')?.addEventListener('click', () => {
+      const locList = document.getElementById('locationList');
+      if (locList) locList.innerHTML = availableDepots.map(d => `<div class="flex justify-between items-center p-2 bg-slate-50 border rounded-lg"><span class="font-bold text-xs">${d} Depot</span><span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Active</span></div>`).join('');
+      const modal = document.getElementById('userManagerModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    });
+    document.getElementById('closeUsersX')?.addEventListener('click', () => document.getElementById('userManagerModal')?.classList.add('hidden'));
+
+    // Export CSV
+    document.getElementById('exportBtn')?.addEventListener('click', () => {
+      let csv = "Item Code,Description,Category,Unit,Opening,Added,Issues,Closing,Cost Price,Sale Price,Comments\n";
+      inventoryItems.forEach(i => {
+        const closing = (Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0);
+        csv += `"${i.item_code}","${i.description}","${i.category}","${i.unit}",${i.opening},${i.added},${i.issues},${closing},${i.cost_price},${i.selling_price},"${i.comments||''}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateVal = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : 'report';
+      a.download = `Inventory_${currentStoreLocation}_${dateVal}.csv`;
+      a.click();
+    });
+
+    document.getElementById('printBtn')?.addEventListener('click', () => window.print());
+
+    // Category Filter Switcher
+    document.querySelectorAll('#categoryFilter .cat-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('#categoryFilter .cat-btn').forEach(b => {
+          b.className = "cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700";
+        });
+        e.target.className = "cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white";
+        renderTable();
+      });
+    });
+
+    document.getElementById('searchInput')?.addEventListener('input', renderTable);
+    document.getElementById('selectedDate')?.addEventListener('change', loadInventory);
+    document.getElementById('locationSelector')?.addEventListener('change', loadInventory);
+
+    document.getElementById('prevDateBtn')?.addEventListener('click', () => {
+      const dtInput = document.getElementById('selectedDate');
+      if (dtInput) {
+        const d = new Date(dtInput.value);
+        d.setDate(d.getDate() - 1);
+        dtInput.valueAsDate = d;
+        loadInventory();
+      }
+    });
+
+    document.getElementById('nextDateBtn')?.addEventListener('click', () => {
+      const dtInput = document.getElementById('selectedDate');
+      if (dtInput) {
+        const d = new Date(dtInput.value);
+        d.setDate(d.getDate() + 1);
+        dtInput.valueAsDate = d;
+        loadInventory();
+      }
+    });
+
+    document.getElementById('todayBtn')?.addEventListener('click', () => {
+      const dtInput = document.getElementById('selectedDate');
+      if (dtInput) {
+        dtInput.valueAsDate = new Date();
+        loadInventory();
+      }
+    });
 
     // Successful login session handler
     function loginSuccess(user) {
@@ -468,14 +1021,23 @@
       currentStoreLocation = user.location || "Juba";
       
       // Update UI Header
-      document.getElementById('displayUserName').textContent = `${user.display_name} (${user.role})`;
-      document.getElementById('locationBadge').textContent = currentStoreLocation;
-      document.getElementById('locationBadge').className = "text-xs bg-emerald-600 px-2.5 py-0.5 rounded-full ml-2";
-      document.getElementById('printLocationName').textContent = currentStoreLocation;
-      document.getElementById('printUserName').textContent = user.display_name;
+      const userNameEl = document.getElementById('displayUserName');
+      const badgeEl = document.getElementById('locationBadge');
+      const printLoc = document.getElementById('printLocationName');
+      const printUser = document.getElementById('printUserName');
 
-      // Show/hide Manager options
-      if (user.role === 'Manager') {
+      if (userNameEl) userNameEl.textContent = `${user.display_name} (${user.role})`;
+      if (badgeEl) {
+        badgeEl.textContent = currentStoreLocation + " Depot";
+        badgeEl.className = "text-xs bg-emerald-600 px-2.5 py-0.5 rounded-full ml-2 font-bold";
+      }
+      if (printLoc) printLoc.textContent = currentStoreLocation;
+      if (printUser) printUser.textContent = user.display_name;
+
+      renderDepotDropdowns();
+
+      // Show Manager & Action Options
+      if (user.role === 'Manager' || user.role === 'Storekeeper') {
         document.getElementById('transferBtn')?.classList.remove('hidden');
         document.getElementById('auditReportBtn')?.classList.remove('hidden');
         document.getElementById('manageUsersBtn')?.classList.remove('hidden');
@@ -486,28 +1048,35 @@
         document.getElementById('resetStockBtn')?.classList.remove('hidden');
         document.getElementById('newItemBtn')?.classList.remove('hidden');
         document.getElementById('managerLocationBox')?.classList.remove('hidden');
+        document.getElementById('managerLocationBox')?.classList.add('flex');
       }
 
-      // Hide Login Modal
-      document.getElementById('loginModal').classList.add('hidden');
+      // Hide Login Modal & load dataset
+      const loginModal = document.getElementById('loginModal');
+      if (loginModal) loginModal.classList.add('hidden');
+      loadInventory();
     }
 
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const usernameInput = document.getElementById('loginUser').value.trim();
-      const passwordInput = document.getElementById('loginPass').value.trim();
+      const loginUserEl = document.getElementById('loginUser');
+      const loginPassEl = document.getElementById('loginPass');
       const errorDiv = document.getElementById('loginError');
-      errorDiv.classList.add('hidden');
 
-      // 1. Local fallback check for standard admin credentials (instant bypass)
+      const usernameInput = loginUserEl ? loginUserEl.value.trim() : '';
+      const passwordInput = loginPassEl ? loginPassEl.value.trim() : '';
+
+      if (errorDiv) errorDiv.classList.add('hidden');
+
+      // 1. Local check for instant login verification
       const localMatch = fallbackUsers.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
       if (localMatch) {
         loginSuccess(localMatch);
         return;
       }
 
-      // 2. Attempt Supabase login query if local match is not found
-      if (supabaseClient) {
+      // 2. Query Supabase users table
+      if (supabaseClient && isOnline) {
         try {
           const { data, error } = await supabaseClient
             .from('users')
@@ -520,25 +1089,34 @@
             return;
           }
         } catch (err) {
-          console.warn("Supabase Login Exception:", err);
+          console.warn("Supabase Login Query Warning:", err);
         }
       }
 
-      errorDiv.textContent = "Invalid username or password.";
-      errorDiv.classList.remove('hidden');
+      if (errorDiv) {
+        errorDiv.textContent = "Invalid username or password.";
+        errorDiv.classList.remove('hidden');
+      }
     });
 
     // Logout handler
-    document.getElementById('logoutBtn').addEventListener('click', () => {
+    document.getElementById('logoutBtn')?.addEventListener('click', () => {
       currentUser = null;
-      document.getElementById('displayUserName').textContent = "Signed out";
-      document.getElementById('locationBadge').textContent = "Signed out";
-      document.getElementById('locationBadge').className = "text-xs bg-brand-700 px-2.5 py-0.5 rounded-full ml-2";
-      document.getElementById('loginModal').classList.remove('hidden');
+      const userNameEl = document.getElementById('displayUserName');
+      const badgeEl = document.getElementById('locationBadge');
+      const loginModal = document.getElementById('loginModal');
+
+      if (userNameEl) userNameEl.textContent = "Signed out";
+      if (badgeEl) {
+        badgeEl.textContent = "Signed out";
+        badgeEl.className = "text-xs bg-brand-700 px-2.5 py-0.5 rounded-full ml-2";
+      }
+      if (loginModal) loginModal.classList.remove('hidden');
     });
 
-    // Initialize Date Selector to Today
-    document.getElementById('selectedDate').valueAsDate = new Date();
+    // Initialize Date Selector to Today safely
+    const dtSel = document.getElementById('selectedDate');
+    if (dtSel) dtSel.valueAsDate = new Date();
   </script>
 </body>
 </html>
