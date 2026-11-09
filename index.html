@@ -491,6 +491,34 @@
 
     let initializedDepots = new Set();
 
+    // Define Network Status Tracker
+    function updateNetworkStatus() {
+      isOnline = navigator.onLine;
+      const badge = document.getElementById('connectionBadge');
+      if (badge) {
+        if (isOnline) {
+          badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700";
+          badge.innerHTML = '<i class="fa-solid fa-wifi mr-1"></i>Online';
+          syncOfflineQueue();
+        } else {
+          badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800";
+          badge.innerHTML = '<i class="fa-solid fa-wifi-slash mr-1"></i>Offline (12h Cache Active)';
+        }
+      }
+    }
+
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+
+    // Initialize Supabase Client if available
+    try {
+      if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+    } catch (e) {
+      console.warn("Supabase initialization skipped:", e);
+    }
+
     // Global Master Sync with Real-Time Location-by-Location Progress
     async function propagateGlobalMasterData(masterData) {
       // 1. Auto-sync to local masterCatalog registry
