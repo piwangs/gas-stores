@@ -495,12 +495,29 @@
       { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
     ];
 
-    // Seed default sample master catalog items
-    const sampleItems = [
-      { id: 'item-Juba-DRY-01-default', item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', opening: 50, added: 20, issues: 5, cost_price: 18.00, selling_price: 24.00, location: 'Juba', comments: 'Main Stock', updated_at: new Date().toISOString() },
-      { id: 'item-Juba-DRY-02-default', item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', opening: 40, added: 10, issues: 8, cost_price: 9.50, selling_price: 12.50, location: 'Juba', comments: 'Fresh arrival', updated_at: new Date().toISOString() },
-      { id: 'item-Juba-DRK-01-default', item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', opening: 100, added: 0, issues: 15, cost_price: 12.00, selling_price: 18.00, location: 'Juba', comments: 'Cold store', updated_at: new Date().toISOString() }
+    // Master catalog repository (shared across all depots)
+    let masterCatalog = [
+      { item_code: 'DRY-01', description: 'Rice 25kg Bag', category: 'Dry Food Items', unit: 'Bag', cost_price: 18.00, selling_price: 24.00 },
+      { item_code: 'DRY-02', description: 'Cooking Oil 5L', category: 'Dry Food Items', unit: 'Can', cost_price: 9.50, selling_price: 12.50 },
+      { item_code: 'DRK-01', description: 'Coca Cola Cans 330ml (Pack 24)', category: 'Soft Drinks', unit: 'Pack', cost_price: 12.00, selling_price: 18.00 }
     ];
+
+    // Default seed items derived clean from master catalog
+    const sampleItems = masterCatalog.map(m => ({
+      id: `item-Juba-${m.item_code}-default`,
+      item_code: m.item_code,
+      description: m.description,
+      category: m.category,
+      unit: m.unit,
+      opening: 0,
+      added: 0,
+      issues: 0,
+      cost_price: m.cost_price,
+      selling_price: m.selling_price,
+      location: 'Juba',
+      comments: '',
+      updated_at: new Date().toISOString()
+    }));
 
     // Cache management using idb-keyval
     async function getCachedInventory(location, dateStr) {
@@ -625,19 +642,24 @@
 
     // Global Master Data Sync Function Across Depots and Dates
     async function propagateGlobalMasterDataSync(itemCode, updatedMaster) {
+      // 0. Update or insert into global master catalog memory repository
+      const existingMasterIdx = masterCatalog.findIndex(m => m.item_code === itemCode);
+      const masterObj = {
+        item_code: itemCode,
+        description: updatedMaster.description,
+        category: updatedMaster.category,
+        unit: updatedMaster.unit,
+        cost_price: updatedMaster.cost_price,
+        selling_price: updatedMaster.selling_price
+      };
+      if (existingMasterIdx !== -1) {
+        masterCatalog[existingMasterIdx] = masterObj;
+      } else {
+        masterCatalog.push(masterObj);
+      }
+
       // 1. Update matching master catalog items in active dataset memory across all loaded/cached items
       inventoryItems.forEach(item => {
-        if (item.item_code === itemCode) {
-          item.description = updatedMaster.description;
-          item.category = updatedMaster.category;
-          item.unit = updatedMaster.unit;
-          item.cost_price = updatedMaster.cost_price;
-          item.selling_price = updatedMaster.selling_price;
-        }
-      });
-
-      // Update sampleItems master template as well so new depot switches derive updated master fields
-      sampleItems.forEach(item => {
         if (item.item_code === itemCode) {
           item.description = updatedMaster.description;
           item.category = updatedMaster.category;
@@ -784,7 +806,7 @@
 
       // Check IndexedDB cache first
       let cached = await getCachedInventory(currentStoreLocation, selectedDate);
-      if (cached) {
+      if (cached && cached.length > 0) {
         inventoryItems = cached;
       } else if (isOnline && supabaseClient) {
         try {
@@ -797,28 +819,59 @@
           if (!error && data && data.length > 0) {
             inventoryItems = data;
           } else {
-            inventoryItems = sampleItems.map(item => ({ 
-              ...item, 
+            // Build stock list using global masterCatalog so newly added items show up in all depots
+            inventoryItems = masterCatalog.map(item => ({
               id: `item-${currentStoreLocation}-${item.item_code}-${selectedDate}`,
-              location: currentStoreLocation, 
-              record_date: selectedDate 
+              item_code: item.item_code,
+              description: item.description,
+              category: item.category,
+              unit: item.unit,
+              opening: 0,
+              added: 0,
+              issues: 0,
+              cost_price: item.cost_price,
+              selling_price: item.selling_price,
+              location: currentStoreLocation,
+              record_date: selectedDate,
+              comments: '',
+              updated_at: new Date().toISOString()
             }));
           }
         } catch (err) {
-          inventoryItems = sampleItems.map(item => ({ 
-            ...item, 
+          inventoryItems = masterCatalog.map(item => ({
             id: `item-${currentStoreLocation}-${item.item_code}-${selectedDate}`,
-            location: currentStoreLocation, 
-            record_date: selectedDate 
+            item_code: item.item_code,
+            description: item.description,
+            category: item.category,
+            unit: item.unit,
+            opening: 0,
+            added: 0,
+            issues: 0,
+            cost_price: item.cost_price,
+            selling_price: item.selling_price,
+            location: currentStoreLocation,
+            record_date: selectedDate,
+            comments: '',
+            updated_at: new Date().toISOString()
           }));
         }
         await setCachedInventory(currentStoreLocation, selectedDate, inventoryItems);
       } else {
-        inventoryItems = sampleItems.map(item => ({ 
-          ...item, 
+        inventoryItems = masterCatalog.map(item => ({
           id: `item-${currentStoreLocation}-${item.item_code}-${selectedDate}`,
-          location: currentStoreLocation, 
-          record_date: selectedDate 
+          item_code: item.item_code,
+          description: item.description,
+          category: item.category,
+          unit: item.unit,
+          opening: 0,
+          added: 0,
+          issues: 0,
+          cost_price: item.cost_price,
+          selling_price: item.selling_price,
+          location: currentStoreLocation,
+          record_date: selectedDate,
+          comments: '',
+          updated_at: new Date().toISOString()
         }));
       }
 
