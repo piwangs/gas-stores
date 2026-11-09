@@ -625,7 +625,7 @@
 
     // Global Master Data Sync Function Across Depots and Dates
     async function propagateGlobalMasterDataSync(itemCode, updatedMaster) {
-      // 1. Update matching master catalog items in active dataset memory
+      // 1. Update matching master catalog items in active dataset memory across all loaded/cached items
       inventoryItems.forEach(item => {
         if (item.item_code === itemCode) {
           item.description = updatedMaster.description;
@@ -636,7 +636,31 @@
         }
       });
 
-      // 2. Update Supabase Cloud DB globally across ALL depots & dates for this item_code
+      // Update sampleItems master template as well so new depot switches derive updated master fields
+      sampleItems.forEach(item => {
+        if (item.item_code === itemCode) {
+          item.description = updatedMaster.description;
+          item.category = updatedMaster.category;
+          item.unit = updatedMaster.unit;
+          item.cost_price = updatedMaster.cost_price;
+          item.selling_price = updatedMaster.selling_price;
+        }
+      });
+
+      // 2. Clear out date-specific local caches so other depots load the updated master catalog
+      try {
+        if (typeof idbKeyval !== 'undefined') {
+          for (const d of availableDepots) {
+            const selectedDate = document.getElementById('selectedDate') ? document.getElementById('selectedDate').value : new Date().toISOString().split('T')[0];
+            const key = `inventory_${d}_${selectedDate}`;
+            await idbKeyval.del(key);
+          }
+        }
+      } catch (e) {
+        console.warn("Cache clearance warning:", e);
+      }
+
+      // 3. Update Supabase Cloud DB globally across ALL depots & dates for this item_code
       if (isOnline && supabaseClient) {
         try {
           const updatePayload = {
@@ -646,12 +670,13 @@
             cost_price: updatedMaster.cost_price,
             selling_price: updatedMaster.selling_price
           };
+          
           await supabaseClient
             .from('inventory')
             .update(updatePayload)
             .eq('item_code', itemCode);
             
-          showSaveStatus("Global Master Data Synced Across Depots");
+          showSaveStatus("Global Master Data Synced Across All Depots");
         } catch (err) {
           console.warn("Global master sync warning:", err);
         }
