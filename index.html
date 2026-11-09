@@ -462,6 +462,36 @@
       { id: '2', username: 'storekeeper', password: 'password123', display_name: 'Storekeeper', role: 'Storekeeper', location: 'Juba' }
     ];
 
+    // Successful login session handler
+    function loginSuccess(user) {
+      currentUser = user;
+      currentStoreLocation = user.location || "Juba";
+      
+      // Update UI Header
+      document.getElementById('displayUserName').textContent = `${user.display_name} (${user.role})`;
+      document.getElementById('locationBadge').textContent = currentStoreLocation;
+      document.getElementById('locationBadge').className = "text-xs bg-emerald-600 px-2.5 py-0.5 rounded-full ml-2";
+      document.getElementById('printLocationName').textContent = currentStoreLocation;
+      document.getElementById('printUserName').textContent = user.display_name;
+
+      // Show/hide Manager options
+      if (user.role === 'Manager') {
+        document.getElementById('transferBtn')?.classList.remove('hidden');
+        document.getElementById('auditReportBtn')?.classList.remove('hidden');
+        document.getElementById('manageUsersBtn')?.classList.remove('hidden');
+        document.getElementById('downloadTemplateBtn')?.classList.remove('hidden');
+        document.getElementById('uploadExcelLabel')?.classList.remove('hidden');
+        document.getElementById('backupBtn')?.classList.remove('hidden');
+        document.getElementById('restoreLabel')?.classList.remove('hidden');
+        document.getElementById('resetStockBtn')?.classList.remove('hidden');
+        document.getElementById('newItemBtn')?.classList.remove('hidden');
+        document.getElementById('managerLocationBox')?.classList.remove('hidden');
+      }
+
+      // Hide Login Modal
+      document.getElementById('loginModal').classList.add('hidden');
+    }
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const usernameInput = document.getElementById('loginUser').value.trim();
@@ -469,7 +499,14 @@
       const errorDiv = document.getElementById('loginError');
       errorDiv.classList.add('hidden');
 
-      // 1. Attempt Supabase login query first
+      // 1. Local fallback check for standard admin credentials (instant bypass)
+      const localMatch = fallbackUsers.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
+      if (localMatch) {
+        loginSuccess(localMatch);
+        return;
+      }
+
+      // 2. Attempt Supabase login query if local match is not found
       if (supabaseClient) {
         try {
           const { data, error } = await supabaseClient
@@ -481,22 +518,27 @@
           if (!error && data && data.password === passwordInput) {
             loginSuccess(data);
             return;
-          } else if (error) {
-            console.warn("Supabase query error, falling back to local verification:", error);
           }
         } catch (err) {
           console.warn("Supabase Login Exception:", err);
         }
       }
 
-      // 2. Local fallback check for standard admin credentials
-      const localMatch = fallbackUsers.find(u => u.username.toLowerCase() === usernameInput.toLowerCase() && u.password === passwordInput);
-      if (localMatch) {
-        loginSuccess(localMatch);
-        return;
-      }
-
       errorDiv.textContent = "Invalid username or password.";
       errorDiv.classList.remove('hidden');
     });
-<!-- ... existing code -->
+
+    // Logout handler
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      currentUser = null;
+      document.getElementById('displayUserName').textContent = "Signed out";
+      document.getElementById('locationBadge').textContent = "Signed out";
+      document.getElementById('locationBadge').className = "text-xs bg-brand-700 px-2.5 py-0.5 rounded-full ml-2";
+      document.getElementById('loginModal').classList.remove('hidden');
+    });
+
+    // Initialize Date Selector to Today
+    document.getElementById('selectedDate').valueAsDate = new Date();
+  </script>
+</body>
+</html>
