@@ -748,25 +748,48 @@ async function handleLogin(e) {
   e.preventDefault();
   const username = $("loginUser").value.trim();
   const password = $("loginPass").value.trim();
+  $("loginError").classList.add("hidden");
 
-  const { data, error } = await db.rpc('verify_store_user', {
-    input_username: username,
-    input_password: password
-  });
+  let row = null;
 
-  if (error) {
-    console.error("Login RPC error:", error);
-    $("loginError").textContent = "Login error: " + error.message;
+  // 1) Direct table login – fetch by username, check password in app
+  try {
+    const { data, error } = await db
+      .from("store_users")
+      .select("id, username, name, role, location, disabled, password")
+      .ilike("username", username)
+      .limit(1);
+    if (error) console.warn("Direct login query:", error.message);
+    if (data && data.length) {
+      const u = data[0];
+      if (!u.disabled && u.password === password) row = u;
+    }
+  } catch (err) {
+    console.warn(err);
+  }
+
+  // 2) Fallback RPC
+  if (!row) {
+    try {
+      const { data, error } = await db.rpc("verify_store_user", {
+        input_username: username,
+        input_password: password
+      });
+      if (!error) {
+        const rows = Array.isArray(data) ? data : (data ? [data] : []);
+        if (rows.length) row = rows[0];
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  if (!row) {
+    $("loginError").textContent = "Invalid credentials. Try admin / admin2026";
     $("loginError").classList.remove("hidden");
     return;
   }
-  const rows = Array.isArray(data) ? data : (data ? [data] : []);
-  if (!rows.length) {
-    $("loginError").textContent = "Invalid credentials. Use admin / admin12345";
-    $("loginError").classList.remove("hidden");
-    return;
-  }
-  const row = rows[0];
+
   currentUser = {
     id: row.id,
     username: row.username,
