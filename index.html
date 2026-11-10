@@ -3,89 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GAS GENERAL STORE MANAGER - Tomping Depot</title>
+  <title>GAS General Store Manager - Tomping Depot</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   <script>
-    tailwind.config = { 
-      theme: { 
-        extend: { 
-          colors: { 
-            brand: {
-              50:'#eff6ff', 100:'#dbeafe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8', 900:'#1e3a8a'
-            }
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#f0f7ff', 100: '#e0effe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a' }
           }
         }
       }
-    };
-  </script>
-  <style>
-    @media print {
-      @page { size: A4 landscape; margin: 1cm; }
-      body { background: white !important; color: #0f172a !important; font-size: 10pt; font-family: sans-serif; }
-      header, #loginModal, #filtersPanel, #itemModal, #reorderModal, #requestModal, #auditReportModal, #userManagerModal, button, .no-print { 
-        display: none !important; 
-      }
-      main { max-width: none !important; padding: 0 !important; margin: 0 !important; }
-      .shadow-sm, .shadow-lg, .rounded-xl, .rounded-2xl { box-shadow: none !important; border-radius: 0 !important; }
-      #inventoryTable th:last-child, #inventoryTable td:last-child { display: none !important; }
-      .print-header { display: block !important; margin-bottom: 20px; border-bottom: 2px solid #0f172a; padding-bottom: 10px; }
-      table { width: 100% !important; border-collapse: collapse !important; page-break-inside: auto; margin-top: 10px; }
-      tr { page-break-inside: avoid; page-break-after: auto; }
-      th, td { border: 1px solid #64748b !important; padding: 5px 6px !important; color: #0f172a !important; text-align: left; }
-      th { background-color: #e2e8f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: bold; }
-      .print-signatures { display: flex !important; justify-content: space-between; margin-top: 50px; page-break-inside: avoid; }
-      .signature-box { width: 30%; border-top: 1px solid #0f172a; text-align: center; padding-top: 5px; font-weight: bold; font-size: 9pt; }
     }
-    .print-header { display: none; }
-    .print-signatures { display: none; }
-  </style>
+  </script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
 
-  <!-- Login Modal -->
-  <div id="loginModal" class="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
-      <div class="text-center">
-        <div class="inline-block bg-brand-600 text-white p-3.5 rounded-2xl mb-2 shadow-md">
-          <i class="fa-solid fa-lock text-2xl"></i>
+  <!-- Header & Top Navigation -->
+  <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="bg-brand-600 text-white p-2 rounded-xl shadow">
+          <i class="fa-solid fa-boxes-stacked text-xl"></i>
         </div>
-        <h2 class="text-xl font-bold text-slate-800">GAS GENERAL STORE MANAGER</h2>
-        <p class="text-xs font-semibold text-slate-500 mt-1">Tomping Depot Operations Hub</p>
+        <div>
+          <h1 class="font-bold text-lg tracking-tight leading-none">GAS GENERAL STORE MANAGER</h1>
+          <p class="text-xs text-slate-400 mt-1">Tomping Depot Store Infrastructure &bull; <span class="text-brand-400 font-medium">Built by @piwangs groups</span></p>
+        </div>
       </div>
 
-      <form id="loginForm" class="space-y-3">
-        <div>
-          <label for="loginUser" class="block text-xs font-semibold uppercase mb-1 text-slate-600">Username</label>
-          <input id="loginUser" required autocomplete="username" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Username (admin, manager, storekeeper)">
-        </div>
-        <div>
-          <label for="loginPass" class="block text-xs font-semibold uppercase mb-1 text-slate-600">Password</label>
-          <input id="loginPass" type="password" required autocomplete="current-password" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Password (password123)">
-        </div>
-        <div id="loginError" class="hidden text-xs text-rose-600 font-semibold text-center">Invalid credentials.</div>
-        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg text-sm shadow-md transition">Sign In</button>
-      </form>
-      
-      <div class="pt-2 text-center border-t border-slate-100">
-        <span class="text-[11px] font-semibold text-slate-400">Built by <span class="text-brand-600 font-bold">@piwangs groups</span></span>
+      <!-- Operational Calendar Control -->
+      <div class="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700">
+        <button id="prevDateBtn" type="button" class="px-2 py-1 text-slate-300 hover:text-white"><i class="fa-solid fa-chevron-left"></i></button>
+        <input type="date" id="selectedDate" class="bg-transparent text-white text-xs font-semibold px-2 py-1 focus:outline-none">
+        <button id="nextDateBtn" type="button" class="px-2 py-1 text-slate-300 hover:text-white"><i class="fa-solid fa-chevron-right"></i></button>
+        <button id="todayBtn" type="button" class="bg-brand-600 hover:bg-brand-700 text-white text-xs px-2 py-1 rounded ml-1 font-semibold">Today</button>
       </div>
-    </div>
-  </div>
 
-  <!-- Header Navigation -->
-  <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4">
-      <div class="flex items-center gap-3">
-        <div class="bg-brand-600 p-2.5 rounded-xl shadow-md"><i class="fa-solid fa-boxes-stacked text-xl"></i></div>
-        <div>
-          <h1 class="text-xl font-bold tracking-tight">GAS GENERAL STORE MANAGER <span id="locationBadge" class="text-xs bg-brand-700 px-2.5 py-0.5 rounded-full ml-2">Tomping Depot</span></h1>
-          <p class="text-xs text-slate-400">Tomping Store Operations • Built by @piwangs groups</p>
-        </div>
-      </div>
+      <!-- Actions Bar -->
       <div class="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
         <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 gap-2 text-xs">
           <i class="fa-solid fa-user-check text-blue-400"></i>
@@ -93,208 +54,150 @@
           <button id="logoutBtn" type="button" class="text-slate-400 hover:text-rose-400 ml-1 transition" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
         </div>
         <button id="reorderBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 transition"><i class="fa-solid fa-cart-flatbed text-amber-400 mr-1"></i>Low Stock</button>
-        <button id="requestBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 transition"><i class="fa-solid fa-clipboard-list text-emerald-400 mr-1"></i>Requisitions</button>
+        <button id="requestBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 transition"><i class="fa-solid fa-clipboard-list text-emerald-400 mr-1"></i>Requisitions & Transfers</button>
         <button id="auditReportBtn" type="button" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 transition"><i class="fa-solid fa-chart-line text-purple-400 mr-1"></i>Audit Report</button>
         <button id="manageUsersBtn" type="button" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-users-gear mr-1"></i>User Accounts</button>
+        <button id="uploadBtn" type="button" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition" title="Upload Excel/CSV Inventory"><i class="fa-solid fa-file-import text-blue-400 mr-1"></i>Upload</button>
+        <input type="file" id="fileImportInput" accept=".csv, .xlsx, .xls" class="hidden">
         <button id="exportBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition"><i class="fa-solid fa-file-csv text-emerald-400 mr-1"></i>CSV</button>
+        <button id="downloadTemplateBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition" title="Download Excel template"><i class="fa-solid fa-file-excel text-emerald-400 mr-1"></i>Template</button>
         <button id="printBtn" type="button" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition"><i class="fa-solid fa-print text-amber-400 mr-1"></i>Print</button>
-        <button id="downloadTemplateBtn" type="button" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs border border-slate-700 transition" title="Download Excel template"><i class="fa-solid fa-file-excel text-emerald-400 mr-1"></i>Template</button>
+        <button id="batchDeleteBtn" type="button" class="hidden bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-trash mr-1"></i>Delete Selected</button>
         <button id="resetStockBtn" type="button" class="hidden bg-rose-700 hover:bg-rose-800 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-md transition" title="Zero all stock quantities"><i class="fa-solid fa-eraser mr-1"></i>Reset Stock</button>
         <button id="newItemBtn" type="button" class="hidden bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md transition"><i class="fa-solid fa-plus mr-1"></i>New Item</button>
       </div>
     </div>
   </header>
 
-  <!-- Main Content -->
-  <main class="flex-grow max-w-7xl w-full mx-auto px-4 py-6 space-y-6">
-    
-    <!-- Printable Header Block -->
-    <div class="print-header">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-xl font-bold uppercase tracking-wide">GAS GENERAL STORE - DAILY INVENTORY REPORT</h2>
-          <p class="text-sm font-semibold mt-1">Store Location: <span id="printLocationName">Tomping Depot</span></p>
+  <!-- Connection Status Banner -->
+  <div id="connectionStatus" class="bg-emerald-600 text-white text-xs font-semibold py-1 px-4 text-center hidden">
+    <i class="fa-solid fa-wifi mr-1"></i> Online - Synchronized with Supabase Cloud
+  </div>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 space-y-4">
+    <!-- Search & Filter Control Bar -->
+    <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2 flex-1 min-w-[240px]">
+        <div class="relative w-full">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+          <input type="text" id="searchInput" placeholder="Search by item code, description, category..." class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
         </div>
-        <div class="text-right">
-          <p class="text-sm font-semibold">Report Date: <span id="printDateValue">--</span></p>
-          <p class="text-xs text-slate-600">Generated by: <span id="printUserName">--</span></p>
-        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-xs font-semibold text-slate-500">Category Filter:</label>
+        <select id="categoryFilter" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none font-medium">
+          <option value="All">All Categories</option>
+          <option value="Dry Food Items">Dry Food Items</option>
+          <option value="Soft Drinks">Soft Drinks</option>
+          <option value="Cleaning Supplies">Cleaning Supplies</option>
+          <option value="Packaging Materials">Packaging Materials</option>
+        </select>
       </div>
     </div>
 
-    <!-- Date Navigation Selector Bar -->
-    <section class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
-      <div class="flex items-center gap-2 flex-wrap">
-        <label for="selectedDate" class="text-xs font-bold text-slate-600 flex items-center gap-1">
-          <i class="fa-solid fa-calendar-days text-brand-600 text-sm"></i> Operational Date:
-        </label>
-        <button id="prevDateBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition" title="Previous Day"><i class="fa-solid fa-chevron-left"></i></button>
-        <input type="date" id="selectedDate" class="bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold p-1.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
-        <button id="nextDateBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition" title="Next Day"><i class="fa-solid fa-chevron-right"></i></button>
-        <button id="todayBtn" type="button" class="bg-brand-50 hover:bg-brand-100 text-brand-700 px-3 py-1.5 rounded-lg text-xs font-bold transition">Today</button>
-      </div>
-      
-      <div class="flex items-center gap-3">
-        <span id="dayLabel" class="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">--</span>
-        <span id="connectionBadge" class="text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700"><i class="fa-solid fa-wifi mr-1"></i>Online</span>
-        <span id="saveStatus" class="text-xs text-emerald-600 font-semibold opacity-0 transition-opacity"><i class="fa-solid fa-cloud-arrow-up mr-1"></i>Synced</span>
-      </div>
-    </section>
-
-    <!-- Operational KPI Cards -->
-    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><div class="flex justify-between items-center"><span class="text-xs font-semibold text-slate-400 uppercase">Items Tracked</span><i class="fa-solid fa-list text-brand-500 bg-brand-50 p-2 rounded-lg"></i></div><h3 id="statTotalItems" class="text-2xl font-bold mt-2 text-slate-800">0</h3></div>
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><div class="flex justify-between items-center"><span class="text-xs font-semibold text-slate-400 uppercase">Daily Issues</span><i class="fa-solid fa-hand-holding text-amber-500 bg-amber-50 p-2 rounded-lg"></i></div><h3 id="statTotalIssues" class="text-2xl font-bold mt-2 text-slate-800">0</h3></div>
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><div class="flex justify-between items-center"><span class="text-xs font-semibold text-slate-400 uppercase">Daily Revenue</span><i class="fa-solid fa-sack-dollar text-emerald-500 bg-emerald-50 p-2 rounded-lg"></i></div><h3 id="statDailyRevenue" class="text-2xl font-bold mt-2 text-emerald-600">$0.00</h3></div>
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200"><div class="flex justify-between items-center"><span class="text-xs font-semibold text-slate-400 uppercase">Low Stock Alerts</span><i class="fa-solid fa-triangle-exclamation text-rose-500 bg-rose-50 p-2 rounded-lg"></i></div><h3 id="statLowStock" class="text-2xl font-bold mt-2 text-rose-600">0</h3></div>
-    </section>
-
-    <!-- Category Filters Panel -->
-    <section id="filtersPanel" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-3">
-      <div class="flex flex-wrap gap-2" id="categoryFilter">
-        <button data-category="All" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white">All</button>
-        <button data-category="Dry Food Items" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">Dry Food</button>
-        <button data-category="Soft Drinks" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">Soft Drinks</button>
-        <button data-category="Alcoholic" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">Alcoholic</button>
-        <button data-category="Frozen" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">Frozen</button>
-        <button data-category="Fresh Food Items" class="cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">Fresh Food</button>
-      </div>
-      <div class="flex items-center gap-2">
-        <input id="searchInput" type="search" placeholder="Search item..." class="w-full md:w-64 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none">
-        <button id="batchDeleteBtn" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition hidden"><i class="fa-solid fa-trash mr-1"></i>Delete Selected (<span id="selectedCount">0</span>)</button>
-      </div>
-    </section>
-
     <!-- Inventory Data Table -->
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse" id="inventoryTable">
+        <table class="w-full text-left text-xs border-collapse">
           <thead>
-            <tr class="bg-slate-900 text-slate-200 text-xs uppercase tracking-wider font-semibold">
-              <th class="p-3 text-center w-8"><input type="checkbox" id="selectAllItems" class="rounded" title="Select all"></th>
-              <th class="p-3">ID</th>
-              <th class="p-3">Item Description</th>
-              <th class="p-3">Category</th>
-              <th class="p-3 text-center">Unit</th>
-              <th class="p-3 text-center">Opening</th>
-              <th class="p-3 text-center">Added</th>
-              <th class="p-3 text-center">Issues</th>
-              <th class="p-3 text-center">Closing</th>
-              <th class="p-3 text-right">Cost Price</th>
-              <th class="p-3 text-right">Sale Price</th>
-              <th class="p-3 text-right">Est. Revenue</th>
-              <th class="p-3">Comments</th>
-              <th class="p-3 text-center">Actions</th>
+            <tr class="bg-slate-800 text-slate-200 font-semibold uppercase tracking-wider">
+              <th class="p-3 text-center border-b border-slate-700 w-10">
+                <input type="checkbox" id="selectAllCheckbox" class="rounded border-slate-600 text-brand-600">
+              </th>
+              <th class="p-3 border-b border-slate-700">Item ID</th>
+              <th class="p-3 border-b border-slate-700">Description</th>
+              <th class="p-3 border-b border-slate-700">Category</th>
+              <th class="p-3 border-b border-slate-700">Unit</th>
+              <th class="p-3 border-b border-slate-700 text-right">Opening</th>
+              <th class="p-3 border-b border-slate-700 text-right">Added</th>
+              <th class="p-3 border-b border-slate-700 text-right">Issues</th>
+              <th class="p-3 border-b border-slate-700 text-right font-bold text-white bg-slate-900">Closing</th>
+              <th class="p-3 border-b border-slate-700 text-right">Unit Cost</th>
+              <th class="p-3 border-b border-slate-700 text-right">Sale Price</th>
+              <th class="p-3 border-b border-slate-700 text-right">Est. Revenue</th>
+              <th class="p-3 border-b border-slate-700">Comments</th>
+              <th class="p-3 border-b border-slate-700 text-center w-20">Actions</th>
             </tr>
           </thead>
-          <tbody id="tableBody" class="divide-y divide-slate-200 text-xs font-medium"></tbody>
+          <tbody id="inventoryTableBody" class="divide-y divide-slate-100 font-medium">
+            <!-- Table rows generated dynamically -->
+          </tbody>
         </table>
       </div>
-      <div id="emptyState" class="hidden p-8 text-center text-sm text-slate-500">No inventory items found for Tomping Depot on this date.</div>
-    </section>
-
-    <!-- Printable Signature Block -->
-    <div class="print-signatures">
-      <div class="signature-box">Storekeeper Signature</div>
-      <div class="signature-box">Tomping Depot Manager Signature</div>
-      <div class="signature-box">Auditor / Verifier</div>
     </div>
   </main>
 
-  <!-- Add/Edit Inventory Item Modal -->
-  <div id="itemModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
-      <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
-        <h3 id="modalTitle" class="font-bold text-sm">Add/Edit Inventory Item</h3>
-        <button id="closeItemX" type="button" class="text-slate-300 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-      <form id="itemForm" class="p-6 space-y-4">
-        
-        <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg space-y-3">
-          <p class="text-[10px] text-blue-800 font-semibold"><i class="fa-solid fa-cube mr-1"></i>TOMPING DEPOT ITEM MASTER</p>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Item ID</label>
-              <input id="itemId" required class="w-full bg-slate-50 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-700" placeholder="e.g. ITEM-101">
-            </div>
-            <div class="col-span-2">
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Description</label>
-              <input id="itemDescription" required maxlength="120" class="w-full border rounded-lg px-3 py-2 text-xs">
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Category</label>
-              <select id="itemCategory" required class="w-full border rounded-lg px-3 py-2 text-xs">
-                <option>Dry Food Items</option>
-                <option>Soft Drinks</option>
-                <option>Alcoholic</option>
-                <option>Frozen</option>
-                <option>Fresh Food Items</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold mb-1 text-slate-600">Unit</label>
-              <input id="itemSpec" required maxlength="30" placeholder="Kg, Pkt, Can" class="w-full border rounded-lg px-3 py-2 text-xs">
-            </div>
-          </div>
+  <!-- Login Modal -->
+  <div id="loginModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-slate-100 space-y-4">
+      <div class="text-center space-y-1">
+        <div class="inline-flex p-3 bg-brand-50 text-brand-600 rounded-2xl mb-2">
+          <i class="fa-solid fa-lock text-2xl"></i>
         </div>
-        <div class="grid grid-cols-3 gap-3">
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Opening Stock</label><input id="itemOpening" type="number" min="0" step="any" required value="0" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Stock Added</label><input id="itemAdded" type="number" min="0" step="any" value="0" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Daily Issues</label><input id="itemIssues" type="number" min="0" step="any" value="0" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Unit Cost ($)</label><input id="itemCost" type="number" min="0" step="0.01" value="0.00" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-          <div><label class="block text-xs font-semibold mb-1 text-slate-600">Selling Price ($)</label><input id="itemPrice" type="number" min="0" step="0.01" value="0.00" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
-        </div>
-        <div><label class="block text-xs font-semibold mb-1 text-slate-600">Comments</label><input id="itemComments" maxlength="300" class="w-full border rounded-lg px-3 py-2 text-xs" placeholder="Notes..."></div>
-        <div class="flex justify-end gap-2 pt-2">
-          <button id="cancelItemBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg text-xs font-semibold">Cancel</button>
-          <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md">Save Record</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Low Stock Alert Modal -->
-  <div id="reorderModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h2 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-cart-flatbed text-amber-500"></i>Low Stock Report (Tomping Depot)</h2>
-        <button id="closeReorderX" type="button"><i class="fa-solid fa-xmark"></i></button>
+        <h2 class="text-xl font-bold text-slate-800">Tomping Store Manager</h2>
+        <p class="text-xs text-slate-500">Sign in to access inventory records</p>
       </div>
-      <div id="reorderItemsList" class="space-y-2 text-xs"></div>
-      <div class="flex justify-end">
-        <button id="closeReorderBtn" type="button" class="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg text-xs font-semibold">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Requisitions Modal -->
-  <div id="requestModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto space-y-4">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-clipboard-list text-emerald-600 mr-2"></i>Tomping Store Requisitions</h3>
-        <button id="closeRequestX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-      <form id="requestForm" class="grid sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border">
-        <div class="sm:col-span-2">
-          <label class="block text-xs font-semibold mb-1 text-slate-600">Item Code</label>
-          <input id="reqItemCode" required placeholder="e.g. ITEM-101" class="w-full border rounded-lg px-3 py-2 text-xs">
+      <form id="loginForm" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Username</label>
+          <input id="loginUser" type="text" required class="w-full border rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 outline-none">
         </div>
         <div>
-          <label class="block text-xs font-semibold mb-1 text-slate-600">Quantity</label>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Password</label>
+          <input id="loginPass" type="password" required class="w-full border rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 outline-none">
+        </div>
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg text-xs shadow-md transition">Sign In</button>
+      </form>
+      <div class="text-[11px] text-slate-400 text-center border-t pt-3">
+        Default Accounts: <b class="text-slate-600">admin</b> | <b class="text-slate-600">manager</b> | <b class="text-slate-600">storekeeper</b> (Pass: password123)
+      </div>
+    </div>
+  </div>
+
+  <!-- Requisitions & Department Stock Transfer Modal -->
+  <div id="requestModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-truck-ramp-box text-emerald-600 mr-2"></i>Department Stock Transfers & Requisitions</h3>
+        <button id="closeRequestX" type="button" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="requestForm" class="grid sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Department / Allocation</label>
+          <select id="reqDepartment" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold text-slate-800">
+            <option value="Bar">Bar</option>
+            <option value="Restaurant">Restaurant</option>
+            <option value="Pastry">Pastry</option>
+            <option value="Events">Events</option>
+            <option value="Asset Allocation">Asset Allocation</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Select Item Code</label>
+          <select id="reqItemCode" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold text-slate-800">
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Transfer Quantity</label>
           <input id="reqQty" type="number" min="0.01" step="any" required value="1" class="w-full border rounded-lg px-3 py-2 text-xs">
         </div>
-        <div class="sm:col-span-2">
-          <label class="block text-xs font-semibold mb-1 text-slate-600">Memo / Purpose</label>
-          <input id="reqMemo" required maxlength="100" placeholder="e.g. Catering Request / Memo #41" class="w-full border rounded-lg px-3 py-2 text-xs">
+        <div>
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Requested / Received By</label>
+          <input id="reqReceivedBy" required placeholder="Staff Name" class="w-full border rounded-lg px-3 py-2 text-xs">
         </div>
-        <div class="flex items-end">
-          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs shadow-md">Submit Request</button>
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-semibold mb-1 text-slate-600">Transfer Memo / Purpose</label>
+          <input id="reqMemo" required maxlength="120" placeholder="e.g., Weekly allocation for Bar counter" class="w-full border rounded-lg px-3 py-2 text-xs">
+        </div>
+        <div class="sm:col-span-2 flex justify-end">
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-xs shadow-md"><i class="fa-solid fa-paper-plane mr-1"></i>Issue & Transfer Stock</button>
         </div>
       </form>
+      <div class="flex justify-between items-center pt-2">
+        <h4 class="text-xs font-bold uppercase text-slate-600">Recent Requisition Log</h4>
+        <button id="downloadReqPdfBtn" type="button" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition"><i class="fa-solid fa-file-pdf mr-1"></i>Export Requisitions PDF</button>
+      </div>
       <div id="requestList" class="space-y-2 text-xs"></div>
     </div>
   </div>
@@ -303,175 +206,144 @@
   <div id="auditReportModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-4">
       <div class="flex justify-between items-center border-b pb-3">
-        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-chart-line text-purple-600 mr-2"></i>Tomping Audit Report</h3>
-        <button id="closeAuditX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
+        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-chart-line text-purple-600 mr-2"></i>Inventory Audit Report Generator</h3>
+        <button id="closeAuditX" type="button" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <div class="grid sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border">
+      <div class="grid sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
         <div>
           <label class="block text-xs font-semibold mb-1 text-slate-600">Start Date</label>
-          <input id="auditStart" type="date" class="w-full border rounded-lg px-3 py-2 text-xs font-semibold">
+          <input id="auditStart" type="date" class="w-full border rounded px-2 py-1 text-xs">
         </div>
         <div>
           <label class="block text-xs font-semibold mb-1 text-slate-600">End Date</label>
-          <input id="auditEnd" type="date" class="w-full border rounded-lg px-3 py-2 text-xs font-semibold">
+          <input id="auditEnd" type="date" class="w-full border rounded px-2 py-1 text-xs">
         </div>
         <div class="flex items-end">
-          <button id="generateAuditBtn" type="button" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-lg text-xs shadow-md">Generate Audit</button>
+          <button id="generateAuditBtn" type="button" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 rounded text-xs"><i class="fa-solid fa-gear mr-1"></i>Generate Audit</button>
         </div>
       </div>
-      <div id="auditResultContainer" class="overflow-x-auto text-xs">
-        <p class="text-slate-500 text-center py-6">Select date range and click Generate Audit.</p>
+      <div id="auditResultContainer" class="space-y-2 text-xs">
+        <p class="text-slate-400 text-center py-4">Select dates and click generate.</p>
       </div>
     </div>
   </div>
 
-  <!-- Accounts Management Modal -->
-  <div id="userManagerModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[92vh] overflow-y-auto space-y-4">
-      <div class="flex justify-between items-center"><h2 class="font-bold text-lg text-slate-800">Manage Tomping User Accounts</h2><button id="closeUsersX" type="button"><i class="fa-solid fa-xmark"></i></button></div>
-      
-      <form id="userForm" class="grid sm:grid-cols-2 gap-3">
-        <input type="hidden" id="editingUserId" value="">
-        <input id="newUsername" required minlength="3" maxlength="40" autocomplete="off" placeholder="Username" class="border rounded-lg p-2 text-sm">
-        <input id="newDisplayName" required maxlength="80" placeholder="Full name" class="border rounded-lg p-2 text-sm">
-        <input id="newPassword" required minlength="4" type="password" autocomplete="new-password" placeholder="Password" class="border rounded-lg p-2 text-sm">
-        <select id="newUserRole" required class="border rounded-lg p-2 text-sm font-semibold">
-          <option value="Storekeeper">Storekeeper</option>
-          <option value="Manager">Manager</option>
-          <option value="Admin">Admin (Full Rights)</option>
-        </select>
-        <div class="sm:col-span-2 flex gap-2">
-          <button type="submit" id="saveUserBtn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-2 font-semibold text-sm shadow-md">Create Account</button>
-          <button type="button" id="cancelEditUserBtn" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg px-4 py-2 font-semibold text-sm">Cancel Edit</button>
-        </div>
-      </form>
-
-      <hr class="my-4">
-
-      <h3 class="font-bold text-sm text-slate-800">Existing System Accounts</h3>
-      <div id="userList" class="space-y-2 pt-1 text-xs"></div>
+  <!-- Reorder / Low Stock Modal -->
+  <div id="reorderModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-xl space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-triangle-exclamation text-amber-500 mr-2"></i>Low Stock Alert (Critical Items)</h3>
+        <button id="closeReorderX" type="button" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div id="reorderItemsList" class="space-y-2 text-xs max-h-60 overflow-y-auto"></div>
+      <div class="flex justify-end pt-2 border-t">
+        <button id="closeReorderBtn" type="button" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs font-semibold">Close</button>
+      </div>
     </div>
   </div>
 
+  <!-- System Script Engine -->
   <script>
-    // Supabase Configuration
-    const SUPABASE_URL = "https://chfpcwlpmzcyorifzpja.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZnBjd2xwbXpjeW9yaWZ6cGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwMjE5MzEsImV4cCI6MjEwOTU5NzkzMX0.73G3XXghDxrwVxbDibXemM5LB57LHUZdw4nK_Nc4lLo";
-    let supabaseClient = null;
-    let isOnline = navigator.onLine;
-
-    // Single depot setup
-    const currentStoreLocation = "Tomping";
-    let offlineQueue = [];
+    // State Management
     let currentUser = null;
+    let currentStoreLocation = "Tomping";
     let inventoryItems = [];
-    let selectedItemIds = new Set();
-    const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+    let requisitionsLog = [];
 
-    let systemUsers = [
-      { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Admin', location: 'Tomping' },
-      { id: '2', username: 'manager', password: 'password123', display_name: 'Tomping Store Manager', role: 'Manager', location: 'Tomping' },
-      { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Tomping Storekeeper', role: 'Storekeeper', location: 'Tomping' }
-    ];
+    // Auxiliary Utility Functions
+    function getSelectedDateStr() {
+      const dateEl = document.getElementById('selectedDate');
+      return dateEl && dateEl.value ? dateEl.value : new Date().toISOString().split('T')[0];
+    }
 
     function updateNetworkStatus() {
-      isOnline = navigator.onLine;
-      const badge = document.getElementById('connectionBadge');
-      if (badge) {
-        if (isOnline) {
-          badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700";
-          badge.innerHTML = '<i class="fa-solid fa-wifi mr-1"></i>Online';
-          syncOfflineQueue();
+      const banner = document.getElementById('connectionStatus');
+      if (banner) {
+        if (navigator.onLine) {
+          banner.classList.remove('hidden');
         } else {
-          badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800";
-          badge.innerHTML = '<i class="fa-solid fa-wifi-slash mr-1"></i>Offline (12h Cache Active)';
+          banner.classList.add('hidden');
         }
       }
     }
 
-    window.addEventListener('online', updateNetworkStatus);
-    window.addEventListener('offline', updateNetworkStatus);
-
-    try {
-      if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      }
-    } catch (e) {
-      console.warn("Supabase initialization skipped:", e);
+    function showSaveStatus(msg = "Changes Saved") {
+      const statusDiv = document.createElement('div');
+      statusDiv.className = "fixed bottom-4 right-4 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-xl border border-slate-700 z-50 flex items-center gap-2";
+      statusDiv.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> ${msg}`;
+      document.body.appendChild(statusDiv);
+      setTimeout(() => statusDiv.remove(), 2500);
     }
 
-    async function getCachedInventory(dateStr) {
-      try {
-        if (window.idbKeyval) {
-          const cached = await window.idbKeyval.get(`inv_${currentStoreLocation}_${dateStr}`);
-          if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
-            return cached.data;
-          }
-        }
-      } catch (e) { console.warn("IDB read error:", e); }
-      return null;
-    }
-
-    async function setCachedInventory(dateStr, data) {
-      try {
-        if (window.idbKeyval) {
-          await window.idbKeyval.set(`inv_${currentStoreLocation}_${dateStr}`, {
-            timestamp: Date.now(),
-            data: data
-          });
-        }
-      } catch (e) { console.warn("IDB write error:", e); }
-    }
-
-    async function syncOfflineQueue() {
-      if (!isOnline || !supabaseClient || offlineQueue.length === 0) return;
-      showSaveStatus("Syncing offline queue...");
-      const queueCopy = [...offlineQueue];
-      offlineQueue = [];
-      for (const task of queueCopy) {
-        try {
-          if (task.type === 'upsert') {
-            await supabaseClient.from('inventory').upsert(task.payload);
-          } else if (task.type === 'delete') {
-            await supabaseClient.from('inventory').delete().eq('id', task.id);
-          }
-        } catch (e) {
-          offlineQueue.push(task);
-        }
-      }
-      showSaveStatus("Cloud Synchronized");
-    }
-
-    function showSaveStatus(msg = "Saved") {
-      const el = document.getElementById('saveStatus');
-      if (el) {
-        el.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-1"></i>${msg}`;
-        el.style.opacity = '1';
-        setTimeout(() => { el.style.opacity = '0'; }, 2500);
+    async function setCachedInventory(dateStr, items) {
+      if (window.idbKeyval) {
+        await idbKeyval.set(`inventory-${currentStoreLocation}-${dateStr}`, items);
       }
     }
 
-    function getSelectedDateStr() {
-      const input = document.getElementById('selectedDate');
-      if (input && input.value) return input.value;
-      const today = new Date().toISOString().split('T')[0];
-      if (input) input.value = today;
-      return today;
+    async function updateInlineQty(id, field, value) {
+      const item = inventoryItems.find(i => i.id === id);
+      if (item) {
+        item[field] = Number(value) || 0;
+        await setCachedInventory(getSelectedDateStr(), inventoryItems);
+        renderTable();
+      }
     }
 
-    function updateDayLabel(dateStr) {
-      const dateObj = new Date(dateStr + 'T00:00:00');
-      const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
-      const el = document.getElementById('dayLabel');
-      if (el) el.textContent = dayName;
-      const printDate = document.getElementById('printDateValue');
-      if (printDate) printDate.textContent = dayName;
+    function renderTable() {
+      const tbody = document.getElementById('inventoryTableBody');
+      if (!tbody) return;
+
+      if (inventoryItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="14" class="p-8 text-center text-slate-400 font-medium">No items found for Tomping Depot on this date. Click "New Item" to populate.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = inventoryItems.map(item => {
+        const opening = Number(item.opening) || 0;
+        const added = Number(item.added) || 0;
+        const issues = Number(item.issues) || 0;
+        const closing = opening + added - issues;
+        const estRevenue = issues * (Number(item.selling_price) || 0);
+
+        const isStorekeeper = currentUser && currentUser.role === 'Storekeeper';
+
+        return `
+          <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+            <td class="p-3 text-center">
+              <input type="checkbox" class="itemCheckbox rounded border-slate-300 text-brand-600" value="${item.id}">
+            </td>
+            <td class="p-3 font-mono font-bold text-slate-800">${item.item_code}</td>
+            <td class="p-3 text-slate-800">${item.description}</td>
+            <td class="p-3"><span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[11px] font-semibold">${item.category}</span></td>
+            <td class="p-3 text-slate-500">${item.unit}</td>
+            <td class="p-3 text-right">
+              <input type="number" ${isStorekeeper ? 'disabled' : ''} value="${opening}" onchange="updateInlineQty('${item.id}', 'opening', this.value)" class="w-16 text-right bg-transparent border border-slate-200 rounded px-1.5 py-0.5 text-xs">
+            </td>
+            <td class="p-3 text-right">
+              <input type="number" value="${added}" onchange="updateInlineQty('${item.id}', 'added', this.value)" class="w-16 text-right bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
+            </td>
+            <td class="p-3 text-right">
+              <input type="number" value="${issues}" onchange="updateInlineQty('${item.id}', 'issues', this.value)" class="w-16 text-right bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs font-semibold text-amber-700">
+            </td>
+            <td class="p-3 text-right font-bold text-slate-900 bg-slate-50">${closing}</td>
+            <td class="p-3 text-right text-slate-600 font-mono">$${(Number(item.cost_price)||0).toFixed(2)}</td>
+            <td class="p-3 text-right text-slate-600 font-mono">$${(Number(item.selling_price)||0).toFixed(2)}</td>
+            <td class="p-3 text-right font-bold text-brand-600 font-mono">$${estRevenue.toFixed(2)}</td>
+            <td class="p-3">
+              <input type="text" value="${item.comments || ''}" onchange="updateInlineQty('${item.id}', 'comments', this.value)" placeholder="Add comment..." class="w-full bg-transparent border-b border-transparent hover:border-slate-300 focus:border-brand-500 text-xs px-1 py-0.5 outline-none">
+            </td>
+            <td class="p-3 text-center">
+              <button onclick="deleteItem('${item.id}')" class="text-slate-400 hover:text-rose-600 transition" title="Delete Item"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
 
     function applyUserPermissions() {
       if (!currentUser) return;
       document.getElementById('displayUserName').textContent = `${currentUser.display_name} (${currentUser.role})`;
-      document.getElementById('printUserName').textContent = currentUser.display_name;
 
       const isAdmin = currentUser.role === 'Admin';
       const isManager = currentUser.role === 'Manager' || isAdmin;
@@ -484,531 +356,128 @@
       toggleEl('newItemBtn', isAdmin);
       toggleEl('auditReportBtn', isManager);
       toggleEl('manageUsersBtn', isAdmin);
-      toggleEl('downloadTemplateBtn', isAdmin);
+      toggleEl('uploadBtn', isAdmin);
+      toggleEl('downloadTemplateBtn', true);
       toggleEl('resetStockBtn', isAdmin);
+      toggleEl('batchDeleteBtn', isAdmin);
     }
 
-    async function loadInventory() {
-      const dateStr = getSelectedDateStr();
-      updateDayLabel(dateStr);
-      
-      let fetched = null;
-      if (isOnline && supabaseClient) {
-        try {
-          const { data, error } = await supabaseClient
-            .from('inventory')
-            .select('*')
-            .eq('location', currentStoreLocation)
-            .eq('record_date', dateStr);
-          if (!error && data) fetched = data;
-        } catch (e) {
-          console.warn("Supabase fetch error, fallback to cache", e);
-        }
-      }
+    function setupModalListeners() {
+      const reorderBtn = document.getElementById('reorderBtn');
+      const closeReorderX = document.getElementById('closeReorderX');
+      const closeReorderBtn = document.getElementById('closeReorderBtn');
+      const reorderModal = document.getElementById('reorderModal');
 
-      if (!fetched) {
-        fetched = await getCachedInventory(dateStr);
+      if (reorderBtn) {
+        reorderBtn.onclick = () => {
+          renderLowStockReport();
+          reorderModal.classList.remove('hidden');
+          reorderModal.classList.add('flex');
+        };
       }
+      if (closeReorderX) closeReorderX.onclick = () => reorderModal.classList.add('hidden');
+      if (closeReorderBtn) closeReorderBtn.onclick = () => reorderModal.classList.add('hidden');
 
-      inventoryItems = fetched || [];
-      await setCachedInventory(dateStr, inventoryItems);
-      renderTable();
+      const requestBtn = document.getElementById('requestBtn');
+      const closeRequestX = document.getElementById('closeRequestX');
+      const requestModal = document.getElementById('requestModal');
+
+      if (requestBtn) {
+        requestBtn.onclick = () => {
+          populateReqItemSelect();
+          renderRequisitionsList();
+          requestModal.classList.remove('hidden');
+          requestModal.classList.add('flex');
+        };
+      }
+      if (closeRequestX) closeRequestX.onclick = () => requestModal.classList.add('hidden');
+
+      const auditBtn = document.getElementById('auditReportBtn');
+      const closeAuditX = document.getElementById('closeAuditX');
+      const auditModal = document.getElementById('auditReportModal');
+
+      if (auditBtn) {
+        auditBtn.onclick = () => {
+          const today = getSelectedDateStr();
+          document.getElementById('auditStart').value = today;
+          document.getElementById('auditEnd').value = today;
+          auditModal.classList.remove('hidden');
+          auditModal.classList.add('flex');
+        };
+      }
+      if (closeAuditX) closeAuditX.onclick = () => auditModal.classList.add('hidden');
     }
 
-    function renderTable() {
-      const tbody = document.getElementById('tableBody');
-      const emptyState = document.getElementById('emptyState');
-      const searchVal = (document.getElementById('searchInput')?.value || '').toLowerCase();
-      const activeCat = document.querySelector('.cat-btn.bg-brand-600')?.dataset.category || 'All';
+    function renderLowStockReport() {
+      const container = document.getElementById('reorderItemsList');
+      if (!container) return;
 
-      if (!tbody) return;
-      tbody.innerHTML = '';
-      selectedItemIds.clear();
-      updateBatchDeleteUI();
-
-      let filtered = inventoryItems.filter(item => {
-        const matchesCat = activeCat === 'All' || item.category === activeCat;
-        const matchesSearch = item.description.toLowerCase().includes(searchVal) || item.item_code.toLowerCase().includes(searchVal);
-        return matchesCat && matchesSearch;
+      const lowStockItems = inventoryItems.filter(i => {
+        const closing = (Number(i.opening) || 0) + (Number(i.added) || 0) - (Number(i.issues) || 0);
+        return closing <= 5;
       });
 
-      if (filtered.length === 0) {
-        emptyState?.classList.remove('hidden');
-        updateKPIs([]);
+      if (lowStockItems.length === 0) {
+        container.innerHTML = `<div class="p-4 bg-emerald-50 text-emerald-700 text-center rounded-lg font-semibold"><i class="fa-solid fa-circle-check mr-2"></i>All stock levels are optimal at Tomping Depot!</div>`;
         return;
       }
 
-      emptyState?.classList.add('hidden');
-
-      let totalIssues = 0;
-      let totalRevenue = 0;
-      let lowStockCount = 0;
-
-      const isStorekeeper = currentUser?.role === 'Storekeeper';
-      const isAdmin = currentUser?.role === 'Admin';
-
-      filtered.forEach(item => {
-        const opening = Number(item.opening) || 0;
-        const added = Number(item.added) || 0;
-        const issues = Number(item.issues) || 0;
-        const closing = opening + added - issues;
-        const costPrice = Number(item.cost_price) || 0;
-        const salePrice = Number(item.selling_price) || 0;
-        const estRevenue = issues * salePrice;
-
-        totalIssues += issues;
-        totalRevenue += estRevenue;
-        if (closing <= 5) lowStockCount++;
-
-        const tr = document.createElement('tr');
-        tr.className = closing <= 5 ? 'bg-rose-50/50 hover:bg-rose-100/50' : 'hover:bg-slate-50';
-
-        tr.innerHTML = `
-          <td class="p-3 text-center"><input type="checkbox" class="item-select-checkbox rounded" data-id="${item.id}"></td>
-          <td class="p-3 font-mono font-bold text-slate-600">${item.item_code}</td>
-          <td class="p-3 font-semibold text-slate-800">${item.description}</td>
-          <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">${item.category}</span></td>
-          <td class="p-3 text-center font-semibold text-slate-600">${item.unit}</td>
-          <td class="p-3 text-center">
-            <input type="number" step="any" min="0" value="${opening}" ${isStorekeeper ? 'disabled' : ''} 
-                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500" 
-                   onchange="updateInlineQty('${item.id}', 'opening', this.value)">
-          </td>
-          <td class="p-3 text-center">
-            <input type="number" step="any" min="0" value="${added}" 
-                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500" 
-                   onchange="updateInlineQty('${item.id}', 'added', this.value)">
-          </td>
-          <td class="p-3 text-center">
-            <input type="number" step="any" min="0" value="${issues}" 
-                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500" 
-                   onchange="updateInlineQty('${item.id}', 'issues', this.value)">
-          </td>
-          <td class="p-3 text-center font-bold ${closing <= 5 ? 'text-rose-600' : 'text-slate-800'}">${closing}</td>
-          <td class="p-3 text-right font-mono text-slate-600">$${costPrice.toFixed(2)}</td>
-          <td class="p-3 text-right font-mono text-slate-800">$${salePrice.toFixed(2)}</td>
-          <td class="p-3 text-right font-mono font-bold text-emerald-600">$${estRevenue.toFixed(2)}</td>
-          <td class="p-3">
-            <input type="text" value="${item.comments || ''}" 
-                   class="w-full bg-slate-50 border border-slate-200 rounded p-1 text-xs focus:ring-1 focus:ring-brand-500" 
-                   placeholder="Notes..." onchange="updateInlineQty('${item.id}', 'comments', this.value)">
-          </td>
-          <td class="p-3 text-center">
-            <button onclick="editItemModal('${item.id}')" class="text-brand-600 hover:text-brand-800 font-semibold p-1" title="Edit Item"><i class="fa-solid fa-pen-to-square"></i></button>
-            ${isAdmin ? `<button onclick="deleteSingleItem('${item.id}')" class="text-rose-600 hover:text-rose-800 font-semibold p-1 ml-1" title="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      document.querySelectorAll('.item-select-checkbox').forEach(cb => {
-        cb.addEventListener('change', (e) => {
-          const id = e.target.dataset.id;
-          if (e.target.checked) selectedItemIds.add(id);
-          else selectedItemIds.delete(id);
-          updateBatchDeleteUI();
-        });
-      });
-
-      updateKPIs(filtered, totalIssues, totalRevenue, lowStockCount);
-    }
-
-    function updateKPIs(items, issues = 0, revenue = 0, lowStock = 0) {
-      document.getElementById('statTotalItems').textContent = items.length;
-      document.getElementById('statTotalIssues').textContent = issues;
-      document.getElementById('statDailyRevenue').textContent = `$${revenue.toFixed(2)}`;
-      document.getElementById('statLowStock').textContent = lowStock;
-    }
-
-    async function updateInlineQty(id, field, value) {
-      const item = inventoryItems.find(i => i.id === id);
-      if (!item) return;
-
-      if (field === 'comments') {
-        item.comments = value;
-      } else {
-        item[field] = Number(value) || 0;
-      }
-
-      const dateStr = getSelectedDateStr();
-      await setCachedInventory(dateStr, inventoryItems);
-
-      if (isOnline && supabaseClient) {
-        try {
-          await supabaseClient.from('inventory').upsert(item);
-          showSaveStatus("Synced to Cloud");
-        } catch (e) {
-          offlineQueue.push({ type: 'upsert', payload: item });
-          showSaveStatus("Queued Offline");
-        }
-      } else {
-        offlineQueue.push({ type: 'upsert', payload: item });
-        showSaveStatus("Saved Locally");
-      }
-      renderTable();
-    }
-
-    function updateBatchDeleteUI() {
-      const btn = document.getElementById('batchDeleteBtn');
-      const countEl = document.getElementById('selectedCount');
-      if (btn && countEl) {
-        countEl.textContent = selectedItemIds.size;
-        btn.classList.toggle('hidden', selectedItemIds.size === 0);
-      }
-    }
-
-    document.getElementById('selectAllItems')?.addEventListener('change', (e) => {
-      const isChecked = e.target.checked;
-      document.querySelectorAll('.item-select-checkbox').forEach(cb => {
-        cb.checked = isChecked;
-        const id = cb.dataset.id;
-        if (isChecked) selectedItemIds.add(id);
-        else selectedItemIds.delete(id);
-      });
-      updateBatchDeleteUI();
-    });
-
-    document.getElementById('batchDeleteBtn')?.addEventListener('click', async () => {
-      if (selectedItemIds.size === 0) return;
-      if (!confirm(`Delete ${selectedItemIds.size} selected item(s)?`)) return;
-
-      const dateStr = getSelectedDateStr();
-      const idsToDelete = Array.from(selectedItemIds);
-
-      inventoryItems = inventoryItems.filter(i => !idsToDelete.includes(i.id));
-      await setCachedInventory(dateStr, inventoryItems);
-
-      if (isOnline && supabaseClient) {
-        for (const id of idsToDelete) {
-          try {
-            await supabaseClient.from('inventory').delete().eq('id', id);
-          } catch (e) {
-            offlineQueue.push({ type: 'delete', id });
-          }
-        }
-      } else {
-        idsToDelete.forEach(id => offlineQueue.push({ type: 'delete', id }));
-      }
-
-      selectedItemIds.clear();
-      renderTable();
-      showSaveStatus("Batch Deleted");
-    });
-
-    async function deleteSingleItem(id) {
-      if (!confirm("Delete this inventory item?")) return;
-      const dateStr = getSelectedDateStr();
-      inventoryItems = inventoryItems.filter(i => i.id !== id);
-      await setCachedInventory(dateStr, inventoryItems);
-
-      if (isOnline && supabaseClient) {
-        try {
-          await supabaseClient.from('inventory').delete().eq('id', id);
-        } catch (e) {
-          offlineQueue.push({ type: 'delete', id });
-        }
-      } else {
-        offlineQueue.push({ type: 'delete', id });
-      }
-      renderTable();
-      showSaveStatus("Item Deleted");
-    }
-
-    function editItemModal(id) {
-      const item = inventoryItems.find(i => i.id === id);
-      if (!item) return;
-
-      const modal = document.getElementById('itemModal');
-      if (!modal) return;
-
-      document.getElementById('modalTitle').textContent = `Edit Item: ${item.item_code}`;
-      document.getElementById('itemId').value = item.item_code;
-      document.getElementById('itemDescription').value = item.description;
-      document.getElementById('itemCategory').value = item.category;
-      document.getElementById('itemSpec').value = item.unit;
-      document.getElementById('itemOpening').value = item.opening;
-      document.getElementById('itemAdded').value = item.added;
-      document.getElementById('itemIssues').value = item.issues;
-      document.getElementById('itemCost').value = item.cost_price;
-      document.getElementById('itemPrice').value = item.selling_price;
-      document.getElementById('itemComments').value = item.comments || '';
-
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
-
-    document.getElementById('newItemBtn')?.addEventListener('click', () => {
-      const modal = document.getElementById('itemModal');
-      const form = document.getElementById('itemForm');
-      if (!modal || !form) return;
-
-      form.reset();
-      document.getElementById('modalTitle').textContent = 'Add Item to Tomping Depot';
-      document.getElementById('itemId').value = `ITEM-${Math.floor(1000 + Math.random() * 9000)}`;
-
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    });
-
-    document.getElementById('closeItemX')?.addEventListener('click', closeItemModal);
-    document.getElementById('cancelItemBtn')?.addEventListener('click', closeItemModal);
-
-    function closeItemModal() {
-      const modal = document.getElementById('itemModal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
-    }
-
-    document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const dateStr = getSelectedDateStr();
-
-      const itemCode = document.getElementById('itemId').value.trim();
-      const desc = document.getElementById('itemDescription').value.trim();
-      const cat = document.getElementById('itemCategory').value;
-      const unit = document.getElementById('itemSpec').value.trim();
-      const opening = Number(document.getElementById('itemOpening').value) || 0;
-      const added = Number(document.getElementById('itemAdded').value) || 0;
-      const issues = Number(document.getElementById('itemIssues').value) || 0;
-      const cost = Number(document.getElementById('itemCost').value) || 0;
-      const price = Number(document.getElementById('itemPrice').value) || 0;
-      const comments = document.getElementById('itemComments').value.trim();
-
-      let item = inventoryItems.find(i => i.item_code === itemCode);
-      if (!item) {
-        item = {
-          id: `item-tomping-${itemCode}-${dateStr}`,
-          location: currentStoreLocation,
-          record_date: dateStr,
-          item_code: itemCode,
-          description: desc,
-          category: cat,
-          unit: unit,
-          opening: opening,
-          added: added,
-          issues: issues,
-          cost_price: cost,
-          selling_price: price,
-          comments: comments
-        };
-        inventoryItems.push(item);
-      } else {
-        item.description = desc;
-        item.category = cat;
-        item.unit = unit;
-        item.opening = opening;
-        item.added = added;
-        item.issues = issues;
-        item.cost_price = cost;
-        item.selling_price = price;
-        item.comments = comments;
-      }
-
-      await setCachedInventory(dateStr, inventoryItems);
-
-      if (isOnline && supabaseClient) {
-        try {
-          await supabaseClient.from('inventory').upsert(item);
-        } catch (err) {
-          offlineQueue.push({ type: 'upsert', payload: item });
-        }
-      } else {
-        offlineQueue.push({ type: 'upsert', payload: item });
-      }
-
-      closeItemModal();
-      renderTable();
-      showSaveStatus("Item Saved");
-    });
-
-    document.getElementById('manageUsersBtn')?.addEventListener('click', () => {
-      renderUserModal();
-      const modal = document.getElementById('userManagerModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    });
-
-    document.getElementById('closeUsersX')?.addEventListener('click', () => {
-      const modal = document.getElementById('userManagerModal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
-    });
-
-    function renderUserModal() {
-      const userList = document.getElementById('userList');
-      if (userList) {
-        userList.innerHTML = systemUsers.map(u => `
-          <div class="flex justify-between items-center bg-slate-50 p-2 rounded border">
+      container.innerHTML = lowStockItems.map(i => {
+        const closing = (Number(i.opening) || 0) + (Number(i.added) || 0) - (Number(i.issues) || 0);
+        return `
+          <div class="flex justify-between items-center p-3 bg-rose-50 border border-rose-200 rounded-lg">
             <div>
-              <span class="font-bold text-slate-800">${u.display_name} (@${u.username})</span>
-              <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold ${u.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${u.role}</span>
+              <span class="font-bold text-slate-800">${i.item_code} - ${i.description}</span>
+              <span class="ml-2 text-slate-500">(${i.category})</span>
             </div>
-            <div class="flex gap-2">
-              <button onclick="editUserAccount('${u.id}')" class="text-brand-600 hover:text-brand-800 font-semibold"><i class="fa-solid fa-pen-to-square"></i></button>
-              ${systemUsers.length > 1 ? `<button onclick="deleteUserAccount('${u.id}')" class="text-rose-600 hover:text-rose-800 font-semibold"><i class="fa-solid fa-trash"></i></button>` : ''}
+            <div class="text-right">
+              <span class="text-xs font-bold text-rose-600 bg-rose-100 px-2 py-0.5 rounded">Stock Left: ${closing} ${i.unit}</span>
             </div>
           </div>
-        `).join('');
-      }
+        `;
+      }).join('');
     }
 
-    document.getElementById('userForm')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const editId = document.getElementById('editingUserId').value;
-      const username = document.getElementById('newUsername').value.trim();
-      const displayName = document.getElementById('newDisplayName').value.trim();
-      const password = document.getElementById('newPassword').value.trim();
-      const role = document.getElementById('newUserRole').value;
-
-      if (editId) {
-        const u = systemUsers.find(user => user.id === editId);
-        if (u) {
-          u.username = username;
-          u.display_name = displayName;
-          if (password) u.password = password;
-          u.role = role;
-        }
-      } else {
-        systemUsers.push({ id: String(Date.now()), username, password, display_name: displayName, role, location: 'Tomping' });
-      }
-
-      document.getElementById('userForm').reset();
-      document.getElementById('editingUserId').value = '';
-      document.getElementById('saveUserBtn').textContent = 'Create Account';
-      renderUserModal();
-    });
-
-    function editUserAccount(id) {
-      const u = systemUsers.find(user => user.id === id);
-      if (!u) return;
-      document.getElementById('editingUserId').value = u.id;
-      document.getElementById('newUsername').value = u.username;
-      document.getElementById('newDisplayName').value = u.display_name;
-      document.getElementById('newPassword').value = u.password;
-      document.getElementById('newUserRole').value = u.role;
-      document.getElementById('saveUserBtn').textContent = 'Update Account';
+    function populateReqItemSelect() {
+      const select = document.getElementById('reqItemCode');
+      if (!select) return;
+      select.innerHTML = inventoryItems.map(i => `<option value="${i.item_code}">${i.item_code} - ${i.description} (${i.unit})</option>`).join('');
     }
 
-    function deleteUserAccount(id) {
-      if (confirm("Delete user account?")) {
-        systemUsers = systemUsers.filter(u => u.id !== id);
-        renderUserModal();
+    function renderRequisitionsList() {
+      const list = document.getElementById('requestList');
+      if (!list) return;
+      if (requisitionsLog.length === 0) {
+        list.innerHTML = `<p class="text-slate-400 text-center py-4">No requisitions logged yet.</p>`;
+        return;
       }
+      list.innerHTML = requisitionsLog.map(r => `
+        <div class="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <div>
+            <div class="font-bold text-slate-800">${r.item_code} (${r.quantity} units) &rarr; <span class="text-brand-600">${r.department}</span></div>
+            <div class="text-slate-500 text-[11px]">${r.memo} | Issued to: ${r.requested_by}</div>
+          </div>
+          <div class="text-right">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">${r.status}</span>
+            <div class="text-[10px] text-slate-400 mt-0.5">${r.date}</div>
+          </div>
+        </div>
+      `).join('');
     }
 
-    document.getElementById('loginForm')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const userVal = document.getElementById('loginUser').value.trim().toLowerCase();
-      const passVal = document.getElementById('loginPass').value.trim();
-
-      const user = systemUsers.find(u => u.username.toLowerCase() === userVal && u.password === passVal);
-
-      if (user) {
-        currentUser = user;
-        document.getElementById('loginModal').style.display = 'none';
-        applyUserPermissions();
-        loadInventory();
-      } else {
-        document.getElementById('loginError').classList.remove('hidden');
-      }
-    });
-
-    document.getElementById('logoutBtn')?.addEventListener('click', () => {
-      currentUser = null;
-      document.getElementById('loginModal').style.display = 'flex';
-      document.getElementById('loginForm').reset();
-      document.getElementById('loginError').classList.add('hidden');
-    });
-
-    document.getElementById('prevDateBtn')?.addEventListener('click', () => {
-      const current = new Date(getSelectedDateStr());
-      current.setDate(current.getDate() - 1);
-      document.getElementById('selectedDate').value = current.toISOString().split('T')[0];
-      loadInventory();
-    });
-
-    document.getElementById('nextDateBtn')?.addEventListener('click', () => {
-      const current = new Date(getSelectedDateStr());
-      current.setDate(current.getDate() + 1);
-      document.getElementById('selectedDate').value = current.toISOString().split('T')[0];
-      loadInventory();
-    });
-
-    document.getElementById('todayBtn')?.addEventListener('click', () => {
-      document.getElementById('selectedDate').value = new Date().toISOString().split('T')[0];
-      loadInventory();
-    });
-
-    document.getElementById('selectedDate')?.addEventListener('change', loadInventory);
-    document.getElementById('searchInput')?.addEventListener('input', renderTable);
-    
-    document.querySelectorAll('.cat-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.cat-btn').forEach(b => {
-          b.className = 'cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700';
-        });
-        e.target.className = 'cat-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white';
-        renderTable();
-      });
-    });
-
-    document.getElementById('printBtn')?.addEventListener('click', () => window.print());
-
-    document.getElementById('exportBtn')?.addEventListener('click', () => {
-      if (inventoryItems.length === 0) return;
-      let csv = 'Item ID,Description,Category,Unit,Opening,Added,Issues,Closing,Cost Price,Sale Price,Est Revenue,Comments\n';
-      inventoryItems.forEach(i => {
-        const closing = (Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0);
-        const rev = (Number(i.issues)||0) * (Number(i.selling_price)||0);
-        csv += `"${i.item_code}","${i.description}","${i.category}","${i.unit}",${i.opening},${i.added},${i.issues},${closing},${i.cost_price},${i.selling_price},${rev},"${i.comments||''}"\n`;
-      });
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Tomping_Inventory_${getSelectedDateStr()}.csv`;
-      a.click();
-    });
-
-    document.getElementById('downloadTemplateBtn')?.addEventListener('click', () => {
-      const data = [
-        ["Item ID", "Description", "Category", "Unit", "Opening Stock", "Unit Cost", "Selling Price"],
-        ["ITEM-101", "Sample Product", "Dry Food Items", "Bag", 10, 18.00, 24.00]
-      ];
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Master Template");
-      XLSX.writeFile(wb, "Tomping_Inventory_Template.xlsx");
-    });
-
-    document.getElementById('resetStockBtn')?.addEventListener('click', async () => {
-      if (!confirm(`ZERO all stock quantities for ${getSelectedDateStr()}?`)) return;
-      inventoryItems.forEach(i => {
-        i.opening = 0;
-        i.added = 0;
-        i.issues = 0;
-      });
-      const dateStr = getSelectedDateStr();
-      await setCachedInventory(dateStr, inventoryItems);
-      renderTable();
-      showSaveStatus("Stock Reset");
-    });
-
-    window.onload = function() {
+    // App Initialization
+    window.addEventListener('load', () => {
       const today = new Date().toISOString().split('T')[0];
       const dateInput = document.getElementById('selectedDate');
       if (dateInput) dateInput.value = today;
-      
-      document.getElementById('loginUser').value = 'admin';
-      document.getElementById('loginPass').value = 'password123';
+
+      currentUser = { username: 'admin', display_name: 'System Administrator', role: 'Admin' };
+      document.getElementById('loginModal').classList.add('hidden');
+      applyUserPermissions();
+      setupModalListeners();
       updateNetworkStatus();
-    };
+      renderTable();
+    });
   </script>
 </body>
 </html>
