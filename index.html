@@ -333,33 +333,90 @@
 
   <!-- Store Requests & Requisitions Modal -->
   <div id="requestModal" class="fixed inset-0 bg-slate-900/70 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto space-y-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-4">
       <div class="flex justify-between items-center border-b pb-3">
-        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-clipboard-list text-emerald-600 mr-2"></i>Store Requisitions & Memo Requests</h3>
+        <h3 class="font-bold text-base text-slate-800"><i class="fa-solid fa-clipboard-list text-emerald-600 mr-2"></i>Requisitions & Purchase Orders</h3>
         <div class="flex items-center gap-2">
           <button id="exportReqExcelBtn" type="button" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2.5 py-1.5 rounded-lg text-xs font-semibold"><i class="fa-solid fa-file-excel mr-1"></i>Excel</button>
-          <button id="exportReqPdfBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold"><i class="fa-solid fa-file-pdf mr-1"></i>Print/PDF</button>
+          <button id="exportReqPdfBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold"><i class="fa-solid fa-file-pdf mr-1"></i>PDF</button>
           <button id="closeRequestX" type="button"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
       </div>
-      <form id="requestForm" class="grid sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border">
-        <div class="sm:col-span-2">
-          <label class="block text-xs font-semibold mb-1 text-slate-600">Item</label>
-          <select id="reqItemCode" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold"></select>
+
+      <!-- Tabs -->
+      <div class="flex gap-2 text-xs font-semibold">
+        <button type="button" id="tabReq" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white">Store Requisition</button>
+        <button type="button" id="tabPO" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700">Local Purchase Order</button>
+      </div>
+
+      <!-- REQUISITION PANEL -->
+      <div id="panelReq" class="space-y-3">
+        <div class="grid sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold mb-1 text-slate-600">Item</label>
+            <select id="reqItemCode" class="w-full border rounded-lg px-3 py-2 text-xs font-semibold"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1 text-slate-600">Quantity</label>
+            <input id="reqQty" type="number" min="0.01" step="any" value="1" class="w-full border rounded-lg px-3 py-2 text-xs">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold mb-1 text-slate-600">Memo / Purpose</label>
+            <input id="reqMemo" maxlength="120" placeholder="e.g. Kitchen / Memo #41" class="w-full border rounded-lg px-3 py-2 text-xs">
+          </div>
+          <div class="flex items-end">
+            <button type="button" id="addReqLineBtn" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 rounded-lg text-xs">Add to List</button>
+          </div>
+        </div>
+
+        <div class="border rounded-xl overflow-hidden">
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 flex justify-between">
+            <span>Accumulated Requisition Lines</span>
+            <span id="reqCartCount">0 items</span>
+          </div>
+          <div id="reqCartList" class="max-h-40 overflow-y-auto text-xs divide-y"></div>
+          <div class="p-3 flex flex-wrap gap-2 bg-white border-t">
+            <button type="button" id="submitReqBatchBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold">Submit All for Approval</button>
+            <button type="button" id="clearReqCartBtn" class="bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg text-xs font-semibold">Clear List</button>
+            <button type="button" id="pdfReqCartBtn" class="bg-amber-100 hover:bg-amber-200 text-amber-900 px-3 py-2 rounded-lg text-xs font-semibold">Download Cart PDF</button>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold text-slate-600 mb-2">Submitted Requisitions (Pending / Approved)</h4>
+          <div id="requestList" class="space-y-2 text-xs max-h-48 overflow-y-auto"></div>
+        </div>
+      </div>
+
+      <!-- PURCHASE ORDER PANEL -->
+      <div id="panelPO" class="space-y-3 hidden">
+        <p class="text-[11px] text-slate-500">Local Purchase Order (LPO) – request to buy goods from a local supplier.</p>
+        <div class="grid sm:grid-cols-2 gap-2 bg-blue-50 p-3 rounded-xl border border-blue-100">
+          <div>
+            <label class="block text-xs font-semibold mb-1">Supplier Name</label>
+            <input id="poSupplier" class="w-full border rounded-lg px-3 py-2 text-xs" placeholder="Supplier / shop name">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">Estimated Cost (optional)</label>
+            <input id="poCost" type="number" min="0" step="0.01" class="w-full border rounded-lg px-3 py-2 text-xs" value="0">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold mb-1">Items / Description</label>
+            <textarea id="poItems" rows="2" class="w-full border rounded-lg px-3 py-2 text-xs" placeholder="List items and quantities to purchase"></textarea>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold mb-1">Purpose / Justification</label>
+            <input id="poPurpose" class="w-full border rounded-lg px-3 py-2 text-xs" placeholder="Why is this purchase needed?">
+          </div>
+          <div class="sm:col-span-2">
+            <button type="button" id="submitPOBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold">Submit Purchase Order for Approval</button>
+          </div>
         </div>
         <div>
-          <label class="block text-xs font-semibold mb-1 text-slate-600">Quantity</label>
-          <input id="reqQty" type="number" min="0.01" step="any" required value="1" class="w-full border rounded-lg px-3 py-2 text-xs">
+          <h4 class="text-xs font-bold text-slate-600 mb-2">Purchase Orders</h4>
+          <div id="poList" class="space-y-2 text-xs max-h-48 overflow-y-auto"></div>
         </div>
-        <div class="sm:col-span-2">
-          <label class="block text-xs font-semibold mb-1 text-slate-600">Memo Reference / Purpose</label>
-          <input id="reqMemo" required maxlength="100" placeholder="e.g. Catering Request / Memo #41" class="w-full border rounded-lg px-3 py-2 text-xs">
-        </div>
-        <div class="flex items-end">
-          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs shadow-md">Submit Request</button>
-        </div>
-      </form>
-      <div id="requestList" class="space-y-2 text-xs"></div>
+      </div>
     </div>
   </div>
 
@@ -478,6 +535,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let activeLocation = "Tongping";
+let reqCart = []; // multi-item requisition lines
 let currentActiveCategory = "All";
 let saveStatusTimer = null;
 let currentItems = [];
@@ -490,7 +548,11 @@ const CACHE_KEY_PREFIX = "gas_inv_";
 const QUEUE_KEY = "gas_sync_queue";
 
 const $ = id => document.getElementById(id);
-const isManager = () => !!currentUser && currentUser.role === "Manager";
+const isAdmin = () => !!currentUser && (currentUser.role === "Admin" || currentUser.username === "admin");
+const isManager = () => !!currentUser && (currentUser.role === "Manager" || isAdmin());
+const canApprove = () => isAdmin() || (!!currentUser && currentUser.role === "Manager");
+const canEditInventory = () => isAdmin(); // only Admin can edit stock/items
+const canManageUsers = () => isAdmin();
 
 function localDateString(date = new Date()) {
   const y = date.getFullYear();
@@ -700,6 +762,13 @@ function bindEvents() {
   $("batchDeleteBtn").addEventListener("click", batchDeleteSelected);
   $("exportReqExcelBtn")?.addEventListener("click", exportRequisitionsExcel);
   $("exportReqPdfBtn")?.addEventListener("click", exportRequisitionsPdf);
+  $("addReqLineBtn")?.addEventListener("click", addReqLine);
+  $("submitReqBatchBtn")?.addEventListener("click", submitReqBatch);
+  $("clearReqCartBtn")?.addEventListener("click", clearReqCart);
+  $("pdfReqCartBtn")?.addEventListener("click", downloadReqCartPdf);
+  $("tabReq")?.addEventListener("click", showReqTab);
+  $("tabPO")?.addEventListener("click", showPOTab);
+  $("submitPOBtn")?.addEventListener("click", submitPO);
   $("selectAllItems")?.addEventListener("change", (e) => {
     document.querySelectorAll(".item-check").forEach(cb => { cb.checked = e.target.checked; });
   });
@@ -754,7 +823,7 @@ async function handleLogin(e) {
 
   // LOCAL browser accounts – work even if Supabase is down
   const LOCAL_USERS = [
-    { id: 1, username: "admin", password: "admin2026", name: "General Manager", role: "Manager", location: "Tongping" },
+    { id: 1, username: "admin", password: "admin2026", name: "System Administrator", role: "Admin", location: "Tongping" },
     { id: 3, username: "store_tongping", password: "juba2026", name: "Tongping Storekeeper", role: "Storekeeper", location: "Tongping" },
     { id: 55, username: "Enid", password: "admin2026", name: "Enid", role: "Manager", location: "Tongping" }
   ];
@@ -795,19 +864,22 @@ async function handleLogin(e) {
   const badge = document.getElementById("locationBadge");
   if (badge) badge.textContent = "Tongping";
 
-  const isMgr = currentUser.role === "Manager";
+  const admin = isAdmin();
+  const mgr = canApprove(); // Manager or Admin
   const show = (id, on) => { const el = document.getElementById(id); if (!el) return; el.classList.toggle("hidden", !on); };
   show("managerLocationBox", false);
   show("transferBtn", false);
-  show("newItemBtn", isMgr);
-  show("auditReportBtn", isMgr);
-  show("manageUsersBtn", isMgr);
-  show("downloadTemplateBtn", isMgr);
-  show("uploadExcelLabel", isMgr);
-  show("backupBtn", isMgr);
-  show("restoreLabel", isMgr);
-  show("resetStockBtn", isMgr);
-  show("batchDeleteBtn", isMgr);
+  // Admin only – full control
+  show("newItemBtn", admin);
+  show("manageUsersBtn", admin);
+  show("downloadTemplateBtn", admin);
+  show("uploadExcelLabel", admin);
+  show("backupBtn", admin);
+  show("restoreLabel", admin);
+  show("resetStockBtn", admin);
+  show("batchDeleteBtn", admin);
+  // Manager + Admin – reports & approvals
+  show("auditReportBtn", mgr);
 
   try { await loadLocations(); } catch (e) { console.warn(e); }
   try { loadCloudData(); } catch (e) { console.warn(e); }
@@ -1007,7 +1079,7 @@ function openEditItemModal(id) {
   const item = currentItems.find(i => i.id === id);
   if (!item) return;
 
-  const manager = isManager();
+  const manager = canEditInventory();
   $("modalTitle").textContent = manager ? `Edit Item: ${item.description}` : `Log Stock for: ${item.description}`;
   $("itemId").value = item.item_code;
   $("originalItemCode").value = item.item_code;
@@ -1072,7 +1144,7 @@ async function loadStockDataForModalLocation() {
 }
 
 async function openNewItemModal() {
-  if (!isManager()) return;
+  if (!canEditInventory()) return;
   
   // Fetch next automatic item code
   const { data, error } = await db.rpc('get_next_item_code');
@@ -1285,7 +1357,7 @@ async function saveItem(e) {
 }
 
 async function deleteItem() {
-  if (!isManager()) return;
+  if (!canEditInventory()) return;
   const itemCode = ($("itemId").value || "").trim();
   if (!itemCode) {
     alert("No item code found.");
@@ -1541,106 +1613,194 @@ async function executeTransfer(e) {
   loadCloudData();
 }
 
-// Store Requisitions
+// Store Requisitions + Purchase Orders
 async function openRequestModal() {
-  $("reqQty").value = "1";
-  $("reqMemo").value = "";
-  
+  if ($("reqQty")) $("reqQty").value = "1";
+  if ($("reqMemo")) $("reqMemo").value = "";
   const itemSelect = $("reqItemCode");
-  itemSelect.replaceChildren();
-  currentItems.forEach(i => {
-    const opt = document.createElement("option");
-    opt.value = i.item_code;
-    opt.textContent = `${i.item_code} - ${i.description} (${i.unit})`;
-    itemSelect.appendChild(opt);
-  });
-
+  if (itemSelect) {
+    itemSelect.replaceChildren();
+    currentItems.forEach(i => {
+      const opt = document.createElement("option");
+      opt.value = i.item_code;
+      opt.textContent = i.item_code + " - " + i.description + " (" + i.unit + ")";
+      itemSelect.appendChild(opt);
+    });
+  }
+  renderReqCart();
   await loadRequestsList();
+  await loadPOList();
+  showReqTab();
   $("requestModal").classList.remove("hidden");
   $("requestModal").classList.add("flex");
 }
-
 function closeRequestModal() {
   $("requestModal").classList.add("hidden");
   $("requestModal").classList.remove("flex");
 }
-
-async function submitRequest(e) {
-  e.preventDefault();
-  const payload = {
-    request_date: dateKey(),
-    location: activeLocation,
-    item_code: $("reqItemCode").value,
-    quantity_requested: Number($("reqQty").value),
-    memo_reference: $("reqMemo").value.trim(),
-    status: 'Pending',
-    created_by: currentUser.username
-  };
-
-  if (!isOnline) {
-    await enqueueMutation({ type: "request", payload });
-    $("reqMemo").value = "";
-    showSaveStatus("Request queued offline");
-    // Optionally show a local pending entry in the list
-    const container = $("requestList");
-    const div = document.createElement("div");
-    div.className = "flex justify-between items-center bg-amber-50 p-2 rounded border border-amber-200";
-    div.innerHTML = `
-      <div><b>${payload.item_code}</b> (Qty: ${payload.quantity_requested})<br>
-      <span class="text-[10px] text-slate-500">Memo: ${payload.memo_reference} | Queued offline</span></div>
-      <span class="px-2 py-0.5 rounded font-bold text-[10px] bg-amber-100 text-amber-800">Queued</span>
-    `;
-    container.prepend(div);
-    return;
-  }
-
-  const { error } = await db.from('store_requests').insert([payload]);
-  if (error) {
-    alert("Error submitting request: " + error.message);
-    return;
-  }
-
-  $("reqMemo").value = "";
-  await loadRequestsList();
+function showReqTab() {
+  if ($("panelReq")) $("panelReq").classList.remove("hidden");
+  if ($("panelPO")) $("panelPO").classList.add("hidden");
+  if ($("tabReq")) $("tabReq").className = "px-3 py-1.5 rounded-lg bg-emerald-600 text-white";
+  if ($("tabPO")) $("tabPO").className = "px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700";
 }
-
+function showPOTab() {
+  if ($("panelReq")) $("panelReq").classList.add("hidden");
+  if ($("panelPO")) $("panelPO").classList.remove("hidden");
+  if ($("tabPO")) $("tabPO").className = "px-3 py-1.5 rounded-lg bg-blue-600 text-white";
+  if ($("tabReq")) $("tabReq").className = "px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700";
+}
+function addReqLine() {
+  const code = $("reqItemCode").value;
+  const qty = Number($("reqQty").value) || 0;
+  const memo = ($("reqMemo").value || "").trim() || "Store requisition";
+  if (!code || qty <= 0) { alert("Select item and quantity"); return; }
+  const item = currentItems.find(i => i.item_code === code);
+  const existing = reqCart.find(l => l.item_code === code);
+  if (existing) existing.quantity_requested += qty;
+  else reqCart.push({ item_code: code, description: item ? item.description : code, unit: item ? item.unit : "", quantity_requested: qty, memo_reference: memo });
+  $("reqQty").value = "1";
+  renderReqCart();
+}
+function renderReqCart() {
+  const box = $("reqCartList");
+  const cnt = $("reqCartCount");
+  if (!box) return;
+  box.replaceChildren();
+  if (cnt) cnt.textContent = reqCart.length + " item(s)";
+  if (!reqCart.length) { box.innerHTML = '<div class="p-3 text-slate-400 text-center">No lines yet – add items above</div>'; return; }
+  reqCart.forEach((line, idx) => {
+    const div = document.createElement("div");
+    div.className = "flex justify-between items-center px-3 py-2";
+    div.innerHTML = "<div><b>" + line.item_code + "</b> " + line.description + " <span class='text-slate-500'>× " + line.quantity_requested + " " + (line.unit||"") + "</span><div class='text-[10px] text-slate-500'>" + line.memo_reference + "</div></div><button type='button' data-idx='" + idx + "' class='req-remove text-rose-600 font-bold text-xs'>Remove</button>";
+    box.appendChild(div);
+  });
+  box.querySelectorAll(".req-remove").forEach(btn => { btn.onclick = () => { reqCart.splice(Number(btn.dataset.idx), 1); renderReqCart(); }; });
+}
+async function submitReqBatch() {
+  if (!reqCart.length) { alert("Add at least one item"); return; }
+  const batchId = "REQ-" + Date.now().toString(36).toUpperCase();
+  const rows = reqCart.map(line => ({
+    request_date: dateKey(), location: activeLocation, item_code: line.item_code,
+    quantity_requested: line.quantity_requested,
+    memo_reference: line.memo_reference + " [" + batchId + "]",
+    status: "Pending", created_by: currentUser.username
+  }));
+  if (!isOnline) {
+    for (const payload of rows) await enqueueMutation({ type: "request", payload });
+    alert("Queued offline: " + rows.length + " lines. Ref " + batchId);
+  } else {
+    const { error } = await db.from("store_requests").insert(rows);
+    if (error) { alert("Error: " + error.message); return; }
+    alert("Submitted " + rows.length + " line(s) for approval.\nBatch: " + batchId);
+  }
+  reqCart = []; renderReqCart(); await loadRequestsList();
+}
+function clearReqCart() { reqCart = []; renderReqCart(); }
+function downloadReqCartPdf() {
+  if (!reqCart.length) { alert("Cart is empty"); return; }
+  printRequisitionPdf(reqCart, "DRAFT CART", currentUser ? currentUser.name : "");
+}
+function printRequisitionPdf(lines, statusLabel, byUser) {
+  const w = window.open("", "_blank");
+  if (!w) { alert("Allow pop-ups"); return; }
+  let rows = "";
+  lines.forEach((l, i) => {
+    rows += "<tr><td>"+(i+1)+"</td><td>"+(l.item_code||"")+"</td><td>"+(l.description||"")+"</td><td>"+(l.quantity_requested||"")+"</td><td>"+(l.unit||"")+"</td><td>"+(l.memo_reference||"")+"</td></tr>";
+  });
+  const html = "<!DOCTYPE html><html><head><title>Requisition</title><style>body{font-family:sans-serif;padding:24px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #94a3b8;padding:6px;text-align:left}th{background:#e2e8f0}</style></head><body>" +
+    "<h1>GAS TONGPING – Store Requisition</h1><p>Status: <b>"+statusLabel+"</b> | By: "+byUser+" | "+new Date().toLocaleString()+"</p>" +
+    "<table><thead><tr><th>#</th><th>Code</th><th>Description</th><th>Qty</th><th>Unit</th><th>Memo</th></tr></thead><tbody>"+rows+"</tbody></table>" +
+    "<p style='margin-top:40px;font-size:11px'>Requested _____________ Manager approval _____________ Date ________</p>" +
+    "<scr"+"ipt>window.onload=function(){window.print();}</scr"+"ipt></body></html>";
+  w.document.write(html); w.document.close();
+}
+async function approveRequest(id, status) {
+  if (!canApprove()) return;
+  if (!isOnline) { alert("Approval requires internet"); return; }
+  const { error } = await db.from("store_requests").update({ status: status }).eq("id", id);
+  if (error) alert(error.message); else { await loadRequestsList(); await loadPOList(); }
+}
 async function loadRequestsList() {
   let data = [];
   if (isOnline) {
     try {
-      const res = await db.from('store_requests')
-        .select('*')
-        .eq('location', activeLocation)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const res = await db.from("store_requests").select("*").eq("location", activeLocation).neq("item_code","LPO").order("created_at",{ascending:false}).limit(50);
       data = res.data || [];
-    } catch {
-      data = [];
-    }
+    } catch { data = []; }
   }
-
   const container = $("requestList");
+  if (!container) return;
   container.replaceChildren();
-
-  if (data && data.length > 0) {
-    data.forEach(r => {
-      const item = currentItems.find(i => i.item_code === r.item_code);
-      const div = document.createElement("div");
-      div.className = "flex justify-between items-center bg-slate-50 p-2 rounded border";
-      div.innerHTML = `
-        <div><b>${item ? item.description : r.item_code}</b> (Qty: ${r.quantity_requested})<br><span class="text-[10px] text-slate-500">Memo: ${r.memo_reference} | By: ${r.created_by}</span></div>
-        <span class="px-2 py-0.5 rounded font-bold text-[10px] ${r.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">${r.status}</span>
-      `;
-      container.appendChild(div);
-    });
-  } else {
-    container.innerHTML = `<div class="text-slate-500 text-center py-2">No active requisitions for this location.</div>`;
+  if (!data.length) { container.innerHTML = '<div class="text-slate-400 text-center py-3">No requisitions yet</div>'; return; }
+  data.forEach(r => {
+    const item = currentItems.find(i => i.item_code === r.item_code);
+    const div = document.createElement("div");
+    div.className = "flex justify-between items-center bg-slate-50 p-2 rounded border gap-2";
+    const statusCls = r.status==="Pending"?"bg-amber-100 text-amber-800":r.status==="Approved"?"bg-emerald-100 text-emerald-800":"bg-rose-100 text-rose-800";
+    let actions = "";
+    if (canApprove() && r.status === "Pending") {
+      actions = "<button type='button' class='text-[10px] font-bold text-emerald-700 px-1' data-act='approve' data-id='"+r.id+"'>Approve</button>"+
+        "<button type='button' class='text-[10px] font-bold text-rose-700 px-1' data-act='reject' data-id='"+r.id+"'>Reject</button>";
+    }
+    div.innerHTML = "<div class='flex-1'><b>"+(item?item.description:r.item_code)+"</b> (Qty: "+r.quantity_requested+")<br><span class='text-[10px] text-slate-500'>Memo: "+r.memo_reference+" | By: "+r.created_by+"</span></div><div class='flex items-center gap-1'>"+actions+"<span class='px-2 py-0.5 rounded font-bold text-[10px] "+statusCls+"'>"+r.status+"</span></div>";
+    container.appendChild(div);
+  });
+  container.querySelectorAll("[data-act]").forEach(btn => {
+    btn.onclick = () => approveRequest(btn.dataset.id, btn.dataset.act==="approve"?"Approved":"Rejected");
+  });
+}
+async function submitPO() {
+  const supplier = ($("poSupplier")&&$("poSupplier").value||"").trim();
+  const items = ($("poItems")&&$("poItems").value||"").trim();
+  const purpose = ($("poPurpose")&&$("poPurpose").value||"").trim();
+  const cost = Number($("poCost")&&$("poCost").value)||0;
+  if (!supplier || !items) { alert("Supplier and items required"); return; }
+  const payload = {
+    request_date: dateKey(), location: activeLocation, item_code: "LPO",
+    quantity_requested: cost||1,
+    memo_reference: "LPO | Supplier: "+supplier+" | "+items+(purpose?" | Purpose: "+purpose:""),
+    status: "Pending", created_by: currentUser.username
+  };
+  if (!isOnline) { await enqueueMutation({type:"request",payload}); alert("PO queued offline"); }
+  else {
+    const { error } = await db.from("store_requests").insert([payload]);
+    if (error) { alert(error.message); return; }
+    alert("Purchase order submitted for approval");
   }
+  if ($("poSupplier")) $("poSupplier").value = "";
+  if ($("poItems")) $("poItems").value = "";
+  if ($("poPurpose")) $("poPurpose").value = "";
+  if ($("poCost")) $("poCost").value = "0";
+  await loadPOList();
+}
+async function loadPOList() {
+  const container = $("poList");
+  if (!container) return;
+  container.replaceChildren();
+  if (!isOnline) { container.innerHTML = '<div class="text-slate-400 text-center py-2">Online required</div>'; return; }
+  const { data } = await db.from("store_requests").select("*").eq("location",activeLocation).eq("item_code","LPO").order("created_at",{ascending:false}).limit(30);
+  if (!data||!data.length) { container.innerHTML = '<div class="text-slate-400 text-center py-2">No purchase orders yet</div>'; return; }
+  data.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "flex justify-between items-start bg-blue-50 p-2 rounded border border-blue-100 gap-2";
+    const statusCls = r.status==="Pending"?"bg-amber-100 text-amber-800":r.status==="Approved"?"bg-emerald-100 text-emerald-800":"bg-rose-100 text-rose-800";
+    let actions = "";
+    if (canApprove() && r.status==="Pending") {
+      actions = "<button type='button' class='text-[10px] font-bold text-emerald-700' data-act='approve' data-id='"+r.id+"'>Approve</button> "+
+        "<button type='button' class='text-[10px] font-bold text-rose-700' data-act='reject' data-id='"+r.id+"'>Reject</button>";
+    }
+    div.innerHTML = "<div class='flex-1 text-[11px]'>"+r.memo_reference+"<br><span class='text-slate-500'>By "+r.created_by+"</span></div><div class='text-right'>"+actions+"<div class='px-2 py-0.5 rounded font-bold text-[10px] inline-block "+statusCls+"'>"+r.status+"</div></div>";
+    container.appendChild(div);
+  });
+  container.querySelectorAll("[data-act]").forEach(btn => {
+    btn.onclick = async () => { await approveRequest(btn.dataset.id, btn.dataset.act==="approve"?"Approved":"Rejected"); };
+  });
 }
 
-// Weekly / Monthly Audit Report
+
 function openAuditModal() {
-  if (!isManager()) return;
+  if (!canApprove()) return;
   $("auditStart").value = localDateString();
   $("auditEnd").value = localDateString();
   $("auditResultContainer").innerHTML = `<p class="text-slate-500 text-center py-6">Select date range and click Generate Audit.</p>`;
@@ -1727,7 +1887,7 @@ async function generateAuditReport() {
 
 // Depot & Account Manager
 async function openUserManager() {
-  if (!isManager()) return;
+  if (!canManageUsers()) return;
   await loadLocationsListModal();
   await loadAccountsListModal();
   $("userManagerModal").classList.remove("hidden");
@@ -2352,7 +2512,7 @@ async function handleInventoryRestore(e) {
    ============================================================ */
 
 async function resetAllStock() {
-  if (!isManager()) return;
+  if (!canEditInventory()) return;
   if (!isOnline) {
     alert("Reset requires an internet connection.");
     return;
@@ -2546,7 +2706,7 @@ function exportRequisitionsPdf() {
 }
 
 async function batchDeleteSelected() {
-  if (!isManager()) return;
+  if (!canEditInventory()) return;
   if (!isOnline) {
     alert("Batch delete requires an internet connection.");
     return;
