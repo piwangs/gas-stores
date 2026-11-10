@@ -747,46 +747,30 @@ function bindEvents() {
 
 async function handleLogin(e) {
   e.preventDefault();
-  const usernameEl = document.getElementById("loginUser");
-  const passwordEl = document.getElementById("loginPass");
+  const username = (document.getElementById("loginUser").value || "").trim();
+  const password = (document.getElementById("loginPass").value || "").trim();
   const errorEl = document.getElementById("loginError");
-  const username = (usernameEl.value || "").trim();
-  const password = (passwordEl.value || "").trim();
-  if (errorEl) {
-    errorEl.classList.add("hidden");
-    errorEl.textContent = "";
-  }
+  if (errorEl) { errorEl.classList.add("hidden"); errorEl.textContent = ""; }
 
-  // ===== LOCAL BROWSER LOGIN (works without Supabase) =====
+  // LOCAL browser accounts – work even if Supabase is down
   const LOCAL_USERS = [
     { id: 1, username: "admin", password: "admin2026", name: "General Manager", role: "Manager", location: "Tongping" },
     { id: 3, username: "store_tongping", password: "juba2026", name: "Tongping Storekeeper", role: "Storekeeper", location: "Tongping" },
     { id: 55, username: "Enid", password: "admin2026", name: "Enid", role: "Manager", location: "Tongping" }
   ];
+  let row = LOCAL_USERS.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password) || null;
 
-  let row = LOCAL_USERS.find(u =>
-    u.username.toLowerCase() === username.toLowerCase() && u.password === password
-  ) || null;
-
-  // ===== Optional Supabase (only if local miss) =====
+  // Optional Supabase lookup
   if (!row) {
     try {
-      const { data, error } = await db
-        .from("store_users")
+      const { data, error } = await db.from("store_users")
         .select("id, username, name, role, location, disabled, password")
-        .ilike("username", username)
-        .limit(10);
-      if (!error && data && data.length) {
-        const match = data.find(x =>
-          String(x.username).toLowerCase() === username.toLowerCase() &&
-          String(x.password) === password &&
-          x.disabled !== true
-        );
-        if (match) row = match;
+        .ilike("username", username).limit(10);
+      if (!error && data) {
+        row = data.find(x => String(x.username).toLowerCase() === username.toLowerCase()
+          && String(x.password) === password && x.disabled !== true) || null;
       }
-    } catch (err) {
-      console.warn("Supabase login skipped:", err);
-    }
+    } catch (err) { console.warn(err); }
   }
 
   if (!row) {
@@ -797,14 +781,7 @@ async function handleLogin(e) {
     return;
   }
 
-  // ===== SUCCESS – enter app (never blocked by Supabase) =====
-  currentUser = {
-    id: row.id,
-    username: row.username,
-    name: row.name || row.username,
-    role: row.role,
-    location: "Tongping"
-  };
+  currentUser = { id: row.id, username: row.username, name: row.name || row.username, role: row.role, location: "Tongping" };
   activeLocation = "Tongping";
 
   const loginModal = document.getElementById("loginModal");
@@ -813,18 +790,13 @@ async function handleLogin(e) {
     loginModal.classList.remove("flex");
     loginModal.style.display = "none";
   }
-  const displayName = document.getElementById("displayUserName");
-  if (displayName) displayName.textContent = currentUser.name + " (" + currentUser.role + ")";
+  const dn = document.getElementById("displayUserName");
+  if (dn) dn.textContent = currentUser.name + " (" + currentUser.role + ")";
   const badge = document.getElementById("locationBadge");
   if (badge) badge.textContent = "Tongping";
 
   const isMgr = currentUser.role === "Manager";
-  const show = (id, on) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (on) el.classList.remove("hidden");
-    else el.classList.add("hidden");
-  };
+  const show = (id, on) => { const el = document.getElementById(id); if (!el) return; el.classList.toggle("hidden", !on); };
   show("managerLocationBox", false);
   show("transferBtn", false);
   show("newItemBtn", isMgr);
@@ -837,7 +809,6 @@ async function handleLogin(e) {
   show("resetStockBtn", isMgr);
   show("batchDeleteBtn", isMgr);
 
-  // Load data – ignore network errors so login still succeeds
   try { await loadLocations(); } catch (e) { console.warn(e); }
   try { loadCloudData(); } catch (e) { console.warn(e); }
 }
@@ -845,7 +816,7 @@ async function handleLogin(e) {
 async function loadLocations() {
   const { data } = await db.from('locations').select('name').order('name');
   if (data && data.length) {
-    allLocationsList = ["Tongping"]; // single depot
+    allLocationsList = ["Tongping"];
     
     // Populate location selectors
     ["locationSelector", "itemTargetLocation", "transferFromLoc", "transferToLoc", "newUserLocation", "editUserLocation"].forEach(id => {
@@ -1077,7 +1048,7 @@ function openEditItemModal(id) {
 
 async function loadStockDataForModalLocation() {
   const itemCode = $("itemId").value;
-  const targetLocation = "Tongping"; // single depot
+  const targetLocation = isManager() ? $("itemTargetLocation").value : activeLocation;
   const date = dateKey();
 
   const { data } = await db.from('inventory_entries')
@@ -1145,7 +1116,7 @@ function closeItemModal() {
 
 async function saveItem(e) {
   e.preventDefault();
-  const targetLocation = "Tongping"; // single depot
+  const targetLocation = isManager() ? $("itemTargetLocation").value : activeLocation;
   const itemCode = $("itemId").value.trim();
   const originalCode = ($("originalItemCode").value || "").trim();
   const codeChanged = originalCode && originalCode !== itemCode;
@@ -1247,7 +1218,7 @@ async function saveItem(e) {
         comments: basePayload.p_comments,
         entryDate: dateKey()
       });
-      showSaveStatus("Item saved for Tongping depot");
+      showSaveStatus("New item created in " + (result.locations || "ALL") + " depot(s)");
     } else {
       // Existing item or Storekeeper edit
       const { error } = await db.rpc('secure_upsert_inventory', {
@@ -1405,16 +1376,17 @@ async function ensureItemInAllDepots({
   itemCode, description, category, unit,
   primaryLocation, opening, added, issues, cost, price, comments, entryDate
 }) {
-  // Single-depot (Tongping) only
-  const loc = "Tongping";
-  const { error } = await db.rpc("secure_upsert_inventory", {
+  if (!allLocationsList.length) await loadLocations();
+
+  // Prefer single-transaction RPC
+  const { error: rpcErr } = await db.rpc("create_item_all_locations", {
     p_username: currentUser.username,
-    p_location: loc,
     p_entry_date: entryDate || dateKey(),
     p_item_code: itemCode,
     p_description: description,
     p_category: category,
     p_unit: unit,
+    p_primary_location: primaryLocation,
     p_opening: opening || 0,
     p_added: added || 0,
     p_issues: issues || 0,
@@ -1422,8 +1394,37 @@ async function ensureItemInAllDepots({
     p_price: price || 0,
     p_comments: comments || ""
   });
-  if (error) throw error;
-  return { method: "single", locations: 1 };
+
+  if (!rpcErr) return { method: "rpc", locations: allLocationsList.length || "all" };
+
+  // Fallback: write to every location explicitly
+  console.warn("create_item_all_locations failed, using per-depot fallback:", rpcErr.message);
+  const locs = allLocationsList.length ? allLocationsList : [primaryLocation];
+  let written = 0;
+  const errors = [];
+
+  for (const loc of locs) {
+    const { error } = await db.rpc("secure_upsert_inventory", {
+      p_username: currentUser.username,
+      p_location: loc,
+      p_entry_date: entryDate || dateKey(),
+      p_item_code: itemCode,
+      p_description: description,
+      p_category: category,
+      p_unit: unit,
+      p_opening: (loc === primaryLocation) ? (opening || 0) : 0,
+      p_added: (loc === primaryLocation) ? (added || 0) : 0,
+      p_issues: (loc === primaryLocation) ? (issues || 0) : 0,
+      p_cost: cost || 0,
+      p_price: price || 0,
+      p_comments: comments || ""
+    });
+    if (error) errors.push(loc + ": " + error.message);
+    else written++;
+  }
+
+  if (written === 0) throw new Error(errors.join("; ") || "Failed to write to any depot");
+  return { method: "loop", locations: written, errors };
 }
 
 function filterCategory(cat) {
@@ -2538,7 +2539,7 @@ function exportRequisitionsPdf() {
 
   w.document.write(`</tbody></table>
     <p style="margin-top:40px;font-size:11px;">Storekeeper ________________ &nbsp;&nbsp; Manager ________________ &nbsp;&nbsp; Date ________</p>
-    <script>window.onload=function(){window.print();}</script>
+    '<'+'script>window.onload=function(){window.print();}</'+'script>'
     </body></html>`);
   w.document.close();
   showSaveStatus("Requisitions print/PDF opened");
