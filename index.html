@@ -354,41 +354,46 @@
   </div>
 
   <script>
-    // Supabase Configuration
+    // =====================================================================
+    // GAS GENERAL STORE MANAGER - Tomping Depot (Full Working Version)
+    // =====================================================================
+
     const SUPABASE_URL = "https://chfpcwlpmzcyorifzpja.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZnBjd2xwbXpjeW9yaWZ6cGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwMjE5MzEsImV4cCI6MjEwOTU5NzkzMX0.73G3XXghDxrwVxbDibXemM5LB57LHUZdw4nK_Nc4lLo";
+
     let supabaseClient = null;
     let isOnline = navigator.onLine;
-
-    // Single depot setup
     const currentStoreLocation = "Tomping";
     let offlineQueue = [];
     let currentUser = null;
     let inventoryItems = [];
     let selectedItemIds = new Set();
+    let systemUsers = [];
     const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
-    let systemUsers = [
+    // Seed users (used offline or as fallback)
+    const SEED_USERS = [
       { id: '1', username: 'admin', password: 'password123', display_name: 'System Administrator', role: 'Admin', location: 'Tomping' },
       { id: '2', username: 'manager', password: 'password123', display_name: 'Tomping Store Manager', role: 'Manager', location: 'Tomping' },
       { id: '3', username: 'storekeeper', password: 'password123', display_name: 'Tomping Storekeeper', role: 'Storekeeper', location: 'Tomping' }
     ];
 
+    // ------------------------------------------------------------------
+    // Network + Supabase init
+    // ------------------------------------------------------------------
     function updateNetworkStatus() {
       isOnline = navigator.onLine;
       const badge = document.getElementById('connectionBadge');
-      if (badge) {
-        if (isOnline) {
-          badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700";
-          badge.innerHTML = '<i class="fa-solid fa-wifi mr-1"></i>Online';
-          syncOfflineQueue();
-        } else {
-          badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800";
-          badge.innerHTML = '<i class="fa-solid fa-wifi-slash mr-1"></i>Offline (12h Cache Active)';
-        }
+      if (!badge) return;
+      if (isOnline) {
+        badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700";
+        badge.innerHTML = '<i class="fa-solid fa-wifi mr-1"></i>Online';
+        syncOfflineQueue();
+      } else {
+        badge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800";
+        badge.innerHTML = '<i class="fa-solid fa-wifi-slash mr-1"></i>Offline (12h Cache Active)';
       }
     }
-
     window.addEventListener('online', updateNetworkStatus);
     window.addEventListener('offline', updateNetworkStatus);
 
@@ -397,16 +402,17 @@
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       }
     } catch (e) {
-      console.warn("Supabase initialization skipped:", e);
+      console.warn("Supabase init skipped:", e);
     }
 
+    // ------------------------------------------------------------------
+    // Cache helpers
+    // ------------------------------------------------------------------
     async function getCachedInventory(dateStr) {
       try {
         if (window.idbKeyval) {
           const cached = await window.idbKeyval.get(`inv_${currentStoreLocation}_${dateStr}`);
-          if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
-            return cached.data;
-          }
+          if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) return cached.data;
         }
       } catch (e) { console.warn("IDB read error:", e); }
       return null;
@@ -417,7 +423,7 @@
         if (window.idbKeyval) {
           await window.idbKeyval.set(`inv_${currentStoreLocation}_${dateStr}`, {
             timestamp: Date.now(),
-            data: data
+            data
           });
         }
       } catch (e) { console.warn("IDB write error:", e); }
@@ -434,6 +440,8 @@
             await supabaseClient.from('inventory').upsert(task.payload);
           } else if (task.type === 'delete') {
             await supabaseClient.from('inventory').delete().eq('id', task.id);
+          } else if (task.type === 'requisition') {
+            await supabaseClient.from('requisitions').insert(task.payload);
           }
         } catch (e) {
           offlineQueue.push(task);
@@ -444,13 +452,15 @@
 
     function showSaveStatus(msg = "Saved") {
       const el = document.getElementById('saveStatus');
-      if (el) {
-        el.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-1"></i>${msg}`;
-        el.style.opacity = '1';
-        setTimeout(() => { el.style.opacity = '0'; }, 2500);
-      }
+      if (!el) return;
+      el.innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-1"></i>${msg}`;
+      el.style.opacity = '1';
+      setTimeout(() => { el.style.opacity = '0'; }, 2500);
     }
 
+    // ------------------------------------------------------------------
+    // Date helpers
+    // ------------------------------------------------------------------
     function getSelectedDateStr() {
       const input = document.getElementById('selectedDate');
       if (input && input.value) return input.value;
@@ -468,6 +478,9 @@
       if (printDate) printDate.textContent = dayName;
     }
 
+    // ------------------------------------------------------------------
+    // Permissions
+    // ------------------------------------------------------------------
     function applyUserPermissions() {
       if (!currentUser) return;
       document.getElementById('displayUserName').textContent = `${currentUser.display_name} (${currentUser.role})`;
@@ -476,22 +489,43 @@
       const isAdmin = currentUser.role === 'Admin';
       const isManager = currentUser.role === 'Manager' || isAdmin;
 
-      const toggleEl = (id, show) => {
+      const toggle = (id, show) => {
         const el = document.getElementById(id);
         if (el) el.classList.toggle('hidden', !show);
       };
 
-      toggleEl('newItemBtn', isAdmin);
-      toggleEl('auditReportBtn', isManager);
-      toggleEl('manageUsersBtn', isAdmin);
-      toggleEl('downloadTemplateBtn', isAdmin);
-      toggleEl('resetStockBtn', isAdmin);
+      toggle('newItemBtn', isAdmin);
+      toggle('auditReportBtn', isManager);
+      toggle('manageUsersBtn', isAdmin);
+      toggle('downloadTemplateBtn', isAdmin);
+      toggle('resetStockBtn', isAdmin);
     }
 
+    // ------------------------------------------------------------------
+    // Users (load from Supabase when possible)
+    // ------------------------------------------------------------------
+    async function loadUsers() {
+      if (isOnline && supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient.from('users').select('*');
+          if (!error && data && data.length) {
+            systemUsers = data;
+            return;
+          }
+        } catch (e) {
+          console.warn("Could not load users from Supabase", e);
+        }
+      }
+      systemUsers = [...SEED_USERS];
+    }
+
+    // ------------------------------------------------------------------
+    // Inventory load + render
+    // ------------------------------------------------------------------
     async function loadInventory() {
       const dateStr = getSelectedDateStr();
       updateDayLabel(dateStr);
-      
+
       let fetched = null;
       if (isOnline && supabaseClient) {
         try {
@@ -502,14 +536,11 @@
             .eq('record_date', dateStr);
           if (!error && data) fetched = data;
         } catch (e) {
-          console.warn("Supabase fetch error, fallback to cache", e);
+          console.warn("Supabase fetch error, falling back to cache", e);
         }
       }
 
-      if (!fetched) {
-        fetched = await getCachedInventory(dateStr);
-      }
-
+      if (!fetched) fetched = await getCachedInventory(dateStr);
       inventoryItems = fetched || [];
       await setCachedInventory(dateStr, inventoryItems);
       renderTable();
@@ -526,9 +557,10 @@
       selectedItemIds.clear();
       updateBatchDeleteUI();
 
-      let filtered = inventoryItems.filter(item => {
+      const filtered = inventoryItems.filter(item => {
         const matchesCat = activeCat === 'All' || item.category === activeCat;
-        const matchesSearch = item.description.toLowerCase().includes(searchVal) || item.item_code.toLowerCase().includes(searchVal);
+        const matchesSearch = (item.description || '').toLowerCase().includes(searchVal) ||
+                              (item.item_code || '').toLowerCase().includes(searchVal);
         return matchesCat && matchesSearch;
       });
 
@@ -537,13 +569,9 @@
         updateKPIs([]);
         return;
       }
-
       emptyState?.classList.add('hidden');
 
-      let totalIssues = 0;
-      let totalRevenue = 0;
-      let lowStockCount = 0;
-
+      let totalIssues = 0, totalRevenue = 0, lowStockCount = 0;
       const isStorekeeper = currentUser?.role === 'Storekeeper';
       const isAdmin = currentUser?.role === 'Admin';
 
@@ -570,18 +598,18 @@
           <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">${item.category}</span></td>
           <td class="p-3 text-center font-semibold text-slate-600">${item.unit}</td>
           <td class="p-3 text-center">
-            <input type="number" step="any" min="0" value="${opening}" ${isStorekeeper ? 'disabled' : ''} 
-                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500" 
+            <input type="number" step="any" min="0" value="${opening}" ${isStorekeeper ? 'disabled' : ''}
+                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500"
                    onchange="updateInlineQty('${item.id}', 'opening', this.value)">
           </td>
           <td class="p-3 text-center">
-            <input type="number" step="any" min="0" value="${added}" 
-                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500" 
+            <input type="number" step="any" min="0" value="${added}"
+                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500"
                    onchange="updateInlineQty('${item.id}', 'added', this.value)">
           </td>
           <td class="p-3 text-center">
-            <input type="number" step="any" min="0" value="${issues}" 
-                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500" 
+            <input type="number" step="any" min="0" value="${issues}"
+                   class="w-16 text-center bg-slate-50 border border-slate-200 rounded p-1 font-semibold focus:ring-1 focus:ring-brand-500"
                    onchange="updateInlineQty('${item.id}', 'issues', this.value)">
           </td>
           <td class="p-3 text-center font-bold ${closing <= 5 ? 'text-rose-600' : 'text-slate-800'}">${closing}</td>
@@ -589,12 +617,12 @@
           <td class="p-3 text-right font-mono text-slate-800">$${salePrice.toFixed(2)}</td>
           <td class="p-3 text-right font-mono font-bold text-emerald-600">$${estRevenue.toFixed(2)}</td>
           <td class="p-3">
-            <input type="text" value="${item.comments || ''}" 
-                   class="w-full bg-slate-50 border border-slate-200 rounded p-1 text-xs focus:ring-1 focus:ring-brand-500" 
+            <input type="text" value="${item.comments || ''}"
+                   class="w-full bg-slate-50 border border-slate-200 rounded p-1 text-xs focus:ring-1 focus:ring-brand-500"
                    placeholder="Notes..." onchange="updateInlineQty('${item.id}', 'comments', this.value)">
           </td>
           <td class="p-3 text-center">
-            <button onclick="editItemModal('${item.id}')" class="text-brand-600 hover:text-brand-800 font-semibold p-1" title="Edit Item"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="editItemModal('${item.id}')" class="text-brand-600 hover:text-brand-800 font-semibold p-1" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
             ${isAdmin ? `<button onclick="deleteSingleItem('${item.id}')" class="text-rose-600 hover:text-rose-800 font-semibold p-1 ml-1" title="Delete"><i class="fa-solid fa-trash"></i></button>` : ''}
           </td>
         `;
@@ -620,15 +648,15 @@
       document.getElementById('statLowStock').textContent = lowStock;
     }
 
+    // ------------------------------------------------------------------
+    // Inline updates
+    // ------------------------------------------------------------------
     async function updateInlineQty(id, field, value) {
       const item = inventoryItems.find(i => i.id === id);
       if (!item) return;
 
-      if (field === 'comments') {
-        item.comments = value;
-      } else {
-        item[field] = Number(value) || 0;
-      }
+      if (field === 'comments') item.comments = value;
+      else item[field] = Number(value) || 0;
 
       const dateStr = getSelectedDateStr();
       await setCachedInventory(dateStr, inventoryItems);
@@ -648,6 +676,9 @@
       renderTable();
     }
 
+    // ------------------------------------------------------------------
+    // Batch / single delete
+    // ------------------------------------------------------------------
     function updateBatchDeleteUI() {
       const btn = document.getElementById('batchDeleteBtn');
       const countEl = document.getElementById('selectedCount');
@@ -674,17 +705,13 @@
 
       const dateStr = getSelectedDateStr();
       const idsToDelete = Array.from(selectedItemIds);
-
       inventoryItems = inventoryItems.filter(i => !idsToDelete.includes(i.id));
       await setCachedInventory(dateStr, inventoryItems);
 
       if (isOnline && supabaseClient) {
         for (const id of idsToDelete) {
-          try {
-            await supabaseClient.from('inventory').delete().eq('id', id);
-          } catch (e) {
-            offlineQueue.push({ type: 'delete', id });
-          }
+          try { await supabaseClient.from('inventory').delete().eq('id', id); }
+          catch (e) { offlineQueue.push({ type: 'delete', id }); }
         }
       } else {
         idsToDelete.forEach(id => offlineQueue.push({ type: 'delete', id }));
@@ -702,11 +729,8 @@
       await setCachedInventory(dateStr, inventoryItems);
 
       if (isOnline && supabaseClient) {
-        try {
-          await supabaseClient.from('inventory').delete().eq('id', id);
-        } catch (e) {
-          offlineQueue.push({ type: 'delete', id });
-        }
+        try { await supabaseClient.from('inventory').delete().eq('id', id); }
+        catch (e) { offlineQueue.push({ type: 'delete', id }); }
       } else {
         offlineQueue.push({ type: 'delete', id });
       }
@@ -714,10 +738,12 @@
       showSaveStatus("Item Deleted");
     }
 
+    // ------------------------------------------------------------------
+    // Item Modal
+    // ------------------------------------------------------------------
     function editItemModal(id) {
       const item = inventoryItems.find(i => i.id === id);
       if (!item) return;
-
       const modal = document.getElementById('itemModal');
       if (!modal) return;
 
@@ -741,17 +767,12 @@
       const modal = document.getElementById('itemModal');
       const form = document.getElementById('itemForm');
       if (!modal || !form) return;
-
       form.reset();
       document.getElementById('modalTitle').textContent = 'Add Item to Tomping Depot';
       document.getElementById('itemId').value = `ITEM-${Math.floor(1000 + Math.random() * 9000)}`;
-
       modal.classList.remove('hidden');
       modal.classList.add('flex');
     });
-
-    document.getElementById('closeItemX')?.addEventListener('click', closeItemModal);
-    document.getElementById('cancelItemBtn')?.addEventListener('click', closeItemModal);
 
     function closeItemModal() {
       const modal = document.getElementById('itemModal');
@@ -760,6 +781,8 @@
         modal.classList.remove('flex');
       }
     }
+    document.getElementById('closeItemX')?.addEventListener('click', closeItemModal);
+    document.getElementById('cancelItemBtn')?.addEventListener('click', closeItemModal);
 
     document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -785,35 +808,22 @@
           item_code: itemCode,
           description: desc,
           category: cat,
-          unit: unit,
-          opening: opening,
-          added: added,
-          issues: issues,
+          unit,
+          opening, added, issues,
           cost_price: cost,
           selling_price: price,
-          comments: comments
+          comments
         };
         inventoryItems.push(item);
       } else {
-        item.description = desc;
-        item.category = cat;
-        item.unit = unit;
-        item.opening = opening;
-        item.added = added;
-        item.issues = issues;
-        item.cost_price = cost;
-        item.selling_price = price;
-        item.comments = comments;
+        Object.assign(item, { description: desc, category: cat, unit, opening, added, issues, cost_price: cost, selling_price: price, comments });
       }
 
       await setCachedInventory(dateStr, inventoryItems);
 
       if (isOnline && supabaseClient) {
-        try {
-          await supabaseClient.from('inventory').upsert(item);
-        } catch (err) {
-          offlineQueue.push({ type: 'upsert', payload: item });
-        }
+        try { await supabaseClient.from('inventory').upsert(item); }
+        catch (err) { offlineQueue.push({ type: 'upsert', payload: item }); }
       } else {
         offlineQueue.push({ type: 'upsert', payload: item });
       }
@@ -823,42 +833,283 @@
       showSaveStatus("Item Saved");
     });
 
+    // ------------------------------------------------------------------
+    // Low Stock Modal
+    // ------------------------------------------------------------------
+    function openReorderModal() {
+      const list = document.getElementById('reorderItemsList');
+      if (!list) return;
+
+      const lowItems = inventoryItems.filter(i => {
+        const closing = (Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0);
+        return closing <= 5;
+      });
+
+      if (lowItems.length === 0) {
+        list.innerHTML = `<p class="text-center text-slate-500 py-6">No low-stock items on this date.</p>`;
+      } else {
+        list.innerHTML = lowItems.map(i => {
+          const closing = (Number(i.opening)||0) + (Number(i.added)||0) - (Number(i.issues)||0);
+          return `
+            <div class="flex justify-between items-center bg-rose-50 border border-rose-200 rounded-lg p-3">
+              <div>
+                <div class="font-bold text-slate-800">${i.item_code} – ${i.description}</div>
+                <div class="text-slate-600">${i.category} • ${i.unit}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-rose-700 font-bold text-lg">${closing}</div>
+                <div class="text-[10px] text-slate-500">closing</div>
+              </div>
+            </div>`;
+        }).join('');
+      }
+
+      const modal = document.getElementById('reorderModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    document.getElementById('reorderBtn')?.addEventListener('click', openReorderModal);
+    document.getElementById('closeReorderX')?.addEventListener('click', () => {
+      const m = document.getElementById('reorderModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    });
+    document.getElementById('closeReorderBtn')?.addEventListener('click', () => {
+      const m = document.getElementById('reorderModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    });
+
+    // ------------------------------------------------------------------
+    // Requisitions
+    // ------------------------------------------------------------------
+    async function loadRequisitions() {
+      const container = document.getElementById('requestList');
+      if (!container) return;
+
+      let reqs = [];
+      if (isOnline && supabaseClient) {
+        try {
+          const { data } = await supabaseClient
+            .from('requisitions')
+            .select('*')
+            .eq('location', currentStoreLocation)
+            .order('created_at', { ascending: false })
+            .limit(30);
+          if (data) reqs = data;
+        } catch (e) { console.warn(e); }
+      }
+
+      if (reqs.length === 0) {
+        container.innerHTML = `<p class="text-center text-slate-500 py-4">No requisitions yet.</p>`;
+        return;
+      }
+
+      container.innerHTML = reqs.map(r => `
+        <div class="bg-slate-50 border rounded-lg p-3 flex justify-between items-start gap-3">
+          <div>
+            <div class="font-bold text-slate-800">${r.item_code} × ${r.quantity}</div>
+            <div class="text-slate-600 mt-0.5">${r.memo}</div>
+            <div class="text-[10px] text-slate-400 mt-1">by ${r.requested_by} • ${new Date(r.created_at).toLocaleString()}</div>
+          </div>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold
+            ${r.status === 'Pending' ? 'bg-amber-100 text-amber-800' :
+              r.status === 'Approved' ? 'bg-blue-100 text-blue-800' :
+              r.status === 'Fulfilled' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            ${r.status}
+          </span>
+        </div>`).join('');
+    }
+
+    document.getElementById('requestBtn')?.addEventListener('click', () => {
+      loadRequisitions();
+      const modal = document.getElementById('requestModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    });
+
+    document.getElementById('closeRequestX')?.addEventListener('click', () => {
+      const m = document.getElementById('requestModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    });
+
+    document.getElementById('requestForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentUser) return;
+
+      const payload = {
+        location: currentStoreLocation,
+        item_code: document.getElementById('reqItemCode').value.trim(),
+        quantity: Number(document.getElementById('reqQty').value) || 1,
+        memo: document.getElementById('reqMemo').value.trim(),
+        requested_by: currentUser.display_name,
+        status: 'Pending'
+      };
+
+      if (isOnline && supabaseClient) {
+        try {
+          await supabaseClient.from('requisitions').insert(payload);
+          showSaveStatus("Requisition submitted");
+        } catch (err) {
+          offlineQueue.push({ type: 'requisition', payload });
+          showSaveStatus("Queued Offline");
+        }
+      } else {
+        offlineQueue.push({ type: 'requisition', payload });
+        showSaveStatus("Saved Locally");
+      }
+
+      document.getElementById('requestForm').reset();
+      loadRequisitions();
+    });
+
+    // ------------------------------------------------------------------
+    // Audit Report
+    // ------------------------------------------------------------------
+    document.getElementById('auditReportBtn')?.addEventListener('click', () => {
+      const modal = document.getElementById('auditReportModal');
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('auditStart').value = today;
+      document.getElementById('auditEnd').value = today;
+      document.getElementById('auditResultContainer').innerHTML = `<p class="text-slate-500 text-center py-6">Select date range and click Generate Audit.</p>`;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    });
+
+    document.getElementById('closeAuditX')?.addEventListener('click', () => {
+      const m = document.getElementById('auditReportModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
+    });
+
+    document.getElementById('generateAuditBtn')?.addEventListener('click', async () => {
+      const start = document.getElementById('auditStart').value;
+      const end = document.getElementById('auditEnd').value;
+      const container = document.getElementById('auditResultContainer');
+      if (!start || !end) {
+        container.innerHTML = `<p class="text-rose-600 text-center py-4">Please select both start and end dates.</p>`;
+        return;
+      }
+
+      container.innerHTML = `<p class="text-center py-6 text-slate-500">Generating audit…</p>`;
+
+      let rows = [];
+      if (isOnline && supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient
+            .from('inventory')
+            .select('*')
+            .eq('location', currentStoreLocation)
+            .gte('record_date', start)
+            .lte('record_date', end)
+            .order('record_date');
+          if (!error && data) rows = data;
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+
+      if (rows.length === 0) {
+        container.innerHTML = `<p class="text-center py-6 text-slate-500">No records found for the selected period.</p>`;
+        return;
+      }
+
+      // Aggregate by item_code
+      const map = {};
+      rows.forEach(r => {
+        if (!map[r.item_code]) {
+          map[r.item_code] = {
+            item_code: r.item_code,
+            description: r.description,
+            category: r.category,
+            unit: r.unit,
+            total_added: 0,
+            total_issues: 0,
+            total_revenue: 0,
+            days: 0
+          };
+        }
+        const m = map[r.item_code];
+        m.total_added += Number(r.added) || 0;
+        m.total_issues += Number(r.issues) || 0;
+        m.total_revenue += (Number(r.issues) || 0) * (Number(r.selling_price) || 0);
+        m.days += 1;
+      });
+
+      const aggregated = Object.values(map);
+      const grandIssues = aggregated.reduce((s, i) => s + i.total_issues, 0);
+      const grandRevenue = aggregated.reduce((s, i) => s + i.total_revenue, 0);
+
+      let html = `
+        <div class="mb-4 grid grid-cols-2 gap-3">
+          <div class="bg-slate-100 rounded-lg p-3 text-center">
+            <div class="text-xs text-slate-500">Total Issues</div>
+            <div class="text-xl font-bold">${grandIssues.toFixed(1)}</div>
+          </div>
+          <div class="bg-emerald-50 rounded-lg p-3 text-center">
+            <div class="text-xs text-emerald-700">Est. Revenue</div>
+            <div class="text-xl font-bold text-emerald-700">$${grandRevenue.toFixed(2)}</div>
+          </div>
+        </div>
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-800 text-white">
+              <th class="p-2">Item</th>
+              <th class="p-2">Category</th>
+              <th class="p-2 text-right">Total Added</th>
+              <th class="p-2 text-right">Total Issues</th>
+              <th class="p-2 text-right">Est. Revenue</th>
+              <th class="p-2 text-center">Days</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">`;
+
+      aggregated.forEach(i => {
+        html += `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2 font-semibold">${i.item_code}<br><span class="font-normal text-slate-600">${i.description}</span></td>
+            <td class="p-2">${i.category}</td>
+            <td class="p-2 text-right">${i.total_added}</td>
+            <td class="p-2 text-right font-bold">${i.total_issues}</td>
+            <td class="p-2 text-right font-mono text-emerald-700">$${i.total_revenue.toFixed(2)}</td>
+            <td class="p-2 text-center">${i.days}</td>
+          </tr>`;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    });
+
+    // ------------------------------------------------------------------
+    // User Management
+    // ------------------------------------------------------------------
     document.getElementById('manageUsersBtn')?.addEventListener('click', () => {
       renderUserModal();
       const modal = document.getElementById('userManagerModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
     });
 
     document.getElementById('closeUsersX')?.addEventListener('click', () => {
-      const modal = document.getElementById('userManagerModal');
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
+      const m = document.getElementById('userManagerModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
     });
 
     function renderUserModal() {
       const userList = document.getElementById('userList');
-      if (userList) {
-        userList.innerHTML = systemUsers.map(u => `
-          <div class="flex justify-between items-center bg-slate-50 p-2 rounded border">
-            <div>
-              <span class="font-bold text-slate-800">${u.display_name} (@${u.username})</span>
-              <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold ${u.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${u.role}</span>
-            </div>
-            <div class="flex gap-2">
-              <button onclick="editUserAccount('${u.id}')" class="text-brand-600 hover:text-brand-800 font-semibold"><i class="fa-solid fa-pen-to-square"></i></button>
-              ${systemUsers.length > 1 ? `<button onclick="deleteUserAccount('${u.id}')" class="text-rose-600 hover:text-rose-800 font-semibold"><i class="fa-solid fa-trash"></i></button>` : ''}
-            </div>
+      if (!userList) return;
+      userList.innerHTML = systemUsers.map(u => `
+        <div class="flex justify-between items-center bg-slate-50 p-2 rounded border">
+          <div>
+            <span class="font-bold text-slate-800">${u.display_name} (@${u.username})</span>
+            <span class="ml-2 px-2 py-0.5 rounded text-[10px] font-bold ${u.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${u.role}</span>
           </div>
-        `).join('');
-      }
+          <div class="flex gap-2">
+            <button onclick="editUserAccount('${u.id}')" class="text-brand-600 hover:text-brand-800 font-semibold"><i class="fa-solid fa-pen-to-square"></i></button>
+            ${systemUsers.length > 1 ? `<button onclick="deleteUserAccount('${u.id}')" class="text-rose-600 hover:text-rose-800 font-semibold"><i class="fa-solid fa-trash"></i></button>` : ''}
+          </div>
+        </div>`).join('');
     }
 
-    document.getElementById('userForm')?.addEventListener('submit', (e) => {
+    document.getElementById('userForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const editId = document.getElementById('editingUserId').value;
       const username = document.getElementById('newUsername').value.trim();
@@ -873,18 +1124,37 @@
           u.display_name = displayName;
           if (password) u.password = password;
           u.role = role;
+          if (isOnline && supabaseClient) {
+            try {
+              await supabaseClient.from('users').update({
+                username, display_name: displayName, password: password || u.password, role
+              }).eq('id', editId);
+            } catch (err) { console.warn(err); }
+          }
         }
       } else {
-        systemUsers.push({ id: String(Date.now()), username, password, display_name: displayName, role, location: 'Tomping' });
+        const newUser = {
+          id: String(Date.now()),
+          username, password, display_name: displayName, role, location: 'Tomping'
+        };
+        systemUsers.push(newUser);
+        if (isOnline && supabaseClient) {
+          try {
+            await supabaseClient.from('users').insert({
+              username, password, display_name: displayName, role, location: 'Tomping'
+            });
+          } catch (err) { console.warn(err); }
+        }
       }
 
       document.getElementById('userForm').reset();
       document.getElementById('editingUserId').value = '';
       document.getElementById('saveUserBtn').textContent = 'Create Account';
+      document.getElementById('cancelEditUserBtn').classList.add('hidden');
       renderUserModal();
     });
 
-    function editUserAccount(id) {
+    window.editUserAccount = function(id) {
       const u = systemUsers.find(user => user.id === id);
       if (!u) return;
       document.getElementById('editingUserId').value = u.id;
@@ -893,19 +1163,36 @@
       document.getElementById('newPassword').value = u.password;
       document.getElementById('newUserRole').value = u.role;
       document.getElementById('saveUserBtn').textContent = 'Update Account';
-    }
+      document.getElementById('cancelEditUserBtn').classList.remove('hidden');
+    };
 
-    function deleteUserAccount(id) {
-      if (confirm("Delete user account?")) {
-        systemUsers = systemUsers.filter(u => u.id !== id);
-        renderUserModal();
+    window.deleteUserAccount = async function(id) {
+      if (!confirm("Delete user account?")) return;
+      systemUsers = systemUsers.filter(u => u.id !== id);
+      if (isOnline && supabaseClient) {
+        try { await supabaseClient.from('users').delete().eq('id', id); }
+        catch (e) { console.warn(e); }
       }
-    }
+      renderUserModal();
+    };
 
-    document.getElementById('loginForm')?.addEventListener('submit', (e) => {
+    document.getElementById('cancelEditUserBtn')?.addEventListener('click', () => {
+      document.getElementById('userForm').reset();
+      document.getElementById('editingUserId').value = '';
+      document.getElementById('saveUserBtn').textContent = 'Create Account';
+      document.getElementById('cancelEditUserBtn').classList.add('hidden');
+    });
+
+    // ------------------------------------------------------------------
+    // Auth
+    // ------------------------------------------------------------------
+    document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const userVal = document.getElementById('loginUser').value.trim().toLowerCase();
       const passVal = document.getElementById('loginPass').value.trim();
+
+      // Ensure users are loaded
+      if (systemUsers.length === 0) await loadUsers();
 
       const user = systemUsers.find(u => u.username.toLowerCase() === userVal && u.password === passVal);
 
@@ -926,6 +1213,9 @@
       document.getElementById('loginError').classList.add('hidden');
     });
 
+    // ------------------------------------------------------------------
+    // Date navigation + filters
+    // ------------------------------------------------------------------
     document.getElementById('prevDateBtn')?.addEventListener('click', () => {
       const current = new Date(getSelectedDateStr());
       current.setDate(current.getDate() - 1);
@@ -947,7 +1237,7 @@
 
     document.getElementById('selectedDate')?.addEventListener('change', loadInventory);
     document.getElementById('searchInput')?.addEventListener('input', renderTable);
-    
+
     document.querySelectorAll('.cat-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         document.querySelectorAll('.cat-btn').forEach(b => {
@@ -958,6 +1248,9 @@
       });
     });
 
+    // ------------------------------------------------------------------
+    // Export / Print / Template / Reset
+    // ------------------------------------------------------------------
     document.getElementById('printBtn')?.addEventListener('click', () => window.print());
 
     document.getElementById('exportBtn')?.addEventListener('click', () => {
@@ -990,25 +1283,41 @@
     document.getElementById('resetStockBtn')?.addEventListener('click', async () => {
       if (!confirm(`ZERO all stock quantities for ${getSelectedDateStr()}?`)) return;
       inventoryItems.forEach(i => {
-        i.opening = 0;
-        i.added = 0;
-        i.issues = 0;
+        i.opening = 0; i.added = 0; i.issues = 0;
       });
       const dateStr = getSelectedDateStr();
       await setCachedInventory(dateStr, inventoryItems);
+      // Also push to cloud if possible
+      if (isOnline && supabaseClient) {
+        for (const item of inventoryItems) {
+          try { await supabaseClient.from('inventory').upsert(item); }
+          catch (e) { offlineQueue.push({ type: 'upsert', payload: item }); }
+        }
+      }
       renderTable();
       showSaveStatus("Stock Reset");
     });
 
-    window.onload = function() {
+    // ------------------------------------------------------------------
+    // Boot
+    // ------------------------------------------------------------------
+    window.onload = async function() {
       const today = new Date().toISOString().split('T')[0];
       const dateInput = document.getElementById('selectedDate');
       if (dateInput) dateInput.value = today;
-      
+
+      // Pre-fill login for convenience (remove in production)
       document.getElementById('loginUser').value = 'admin';
       document.getElementById('loginPass').value = 'password123';
+
+      await loadUsers();
       updateNetworkStatus();
     };
+
+    // Make functions available to inline handlers
+    window.updateInlineQty = updateInlineQty;
+    window.editItemModal = editItemModal;
+    window.deleteSingleItem = deleteSingleItem;
   </script>
 </body>
 </html>
