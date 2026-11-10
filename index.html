@@ -67,7 +67,6 @@
           <input id="loginPass" type="password" required autocomplete="current-password" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none" placeholder="Enter password">
         </div>
         <div id="loginError" class="hidden text-xs text-rose-600 font-semibold text-center">Invalid credentials or disabled account.</div>
-        <p class="text-[10px] text-slate-400 text-center">Tongping login: <b>admin</b> / <b>admin2026</b></p>
         <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 rounded-lg text-sm shadow-md transition">Sign In</button>
       </form>
     </div>
@@ -470,7 +469,9 @@
         <select id="newUserRole" required class="border rounded-lg p-2 text-sm font-semibold">
           <option value="Storekeeper">Storekeeper</option>
           <option value="Manager">Manager</option>
-        </select>
+        
+              <option value="Admin">Admin</option>
+            </select>
         <select id="newUserLocation" required class="border rounded-lg p-2 text-sm sm:col-span-2"></select>
         <button type="submit" class="sm:col-span-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg p-2 font-semibold text-sm shadow-md">Create Account</button>
       </form>
@@ -506,6 +507,8 @@
             <select id="editUserRole" required class="w-full border rounded-lg px-3 py-2 text-xs font-semibold">
               <option value="Storekeeper">Storekeeper</option>
               <option value="Manager">Manager</option>
+            
+              <option value="Admin">Admin</option>
             </select>
           </div>
           <div>
@@ -789,30 +792,25 @@ function bindEvents() {
   });
   $("itemForm").addEventListener("submit", saveItem);
   $("deleteItemBtn").addEventListener("click", deleteItem);
-  $("closeItemX").addEventListener("click", closeItemModal);
-  $("cancelItemBtn").addEventListener("click", closeItemModal);
-  $("closeReorderX").addEventListener("click", closeReorderModal);
-  $("closeReorderBtn").addEventListener("click", closeReorderModal);
-  $("itemTargetLocation").addEventListener("change", loadStockDataForModalLocation);
+    $("itemTargetLocation").addEventListener("change", loadStockDataForModalLocation);
 
   $("transferForm").addEventListener("submit", executeTransfer);
-  $("closeTransferX").addEventListener("click", closeTransferModal);
-  $("cancelTransferBtn").addEventListener("click", closeTransferModal);
-
-  $("requestForm").addEventListener("submit", submitRequest);
-  $("closeRequestX").addEventListener("click", closeRequestModal);
-
-  $("generateAuditBtn").addEventListener("click", generateAuditReport);
-  $("closeAuditX").addEventListener("click", closeAuditModal);
-
-  $("locationForm").addEventListener("submit", createLocation);
+    if ($("requestForm")) $("requestForm").addEventListener("submit", e => e.preventDefault());
+  if ($("closeRequestX")) $("closeRequestX").addEventListener("click", closeRequestModal);
+  if ($("closeItemX")) $("closeItemX").addEventListener("click", closeItemModal);
+  if ($("cancelItemBtn")) $("cancelItemBtn").addEventListener("click", closeItemModal);
+  if ($("closeUsersX")) $("closeUsersX").addEventListener("click", closeUserManager);
+  if ($("closeUsersBtn")) $("closeUsersBtn").addEventListener("click", closeUserManager);
+  if ($("closeEditUserX")) $("closeEditUserX").addEventListener("click", closeEditUserModal);
+  if ($("cancelEditUserBtn")) $("cancelEditUserBtn").addEventListener("click", closeEditUserModal);
+  if ($("closeReorderX")) $("closeReorderX").addEventListener("click", closeReorderModal);
+  if ($("closeReorderBtn")) $("closeReorderBtn").addEventListener("click", closeReorderModal);
+  if ($("closeTransferX")) $("closeTransferX").addEventListener("click", closeTransferModal);
+  if ($("cancelTransferBtn")) $("cancelTransferBtn").addEventListener("click", closeTransferModal);
+  if ($("closeAuditX"))   $("generateAuditBtn").addEventListener("click", generateAuditReport);
+    $("locationForm").addEventListener("submit", createLocation);
   $("userForm").addEventListener("submit", createAccount);
-  $("closeUsersX").addEventListener("click", closeUserManager);
-  $("closeUsersBtn").addEventListener("click", closeUserManager);
-  $("editUserForm").addEventListener("submit", saveUserEdits);
-  $("closeEditUserX").addEventListener("click", closeEditUserModal);
-  $("cancelEditUserBtn").addEventListener("click", closeEditUserModal);
-}
+  }
 
 async function handleLogin(e) {
   e.preventDefault();
@@ -844,7 +842,7 @@ async function handleLogin(e) {
 
   if (!row) {
     if (errorEl) {
-      errorEl.textContent = "Invalid credentials. Use admin / admin2026";
+      errorEl.textContent = "Invalid credentials or disabled account.";
       errorEl.classList.remove("hidden");
     }
     return;
@@ -1115,7 +1113,7 @@ function openEditItemModal(id) {
   loadStockDataForModalLocation();
 
   $("itemModal").classList.remove("hidden");
-  $("itemModal").classList.add("flex");
+  const _im = $("itemModal"); if (_im) { _im.style.display = "flex"; _im.classList.add("flex"); _im.classList.remove("hidden"); }
 }
 
 async function loadStockDataForModalLocation() {
@@ -1177,13 +1175,16 @@ async function openNewItemModal() {
   $("itemCost").disabled = false;
   $("itemPrice").disabled = false;
 
-  $("itemModal").classList.add("flex");
+  const _im = $("itemModal"); if (_im) { _im.style.display = "flex"; _im.classList.add("flex"); _im.classList.remove("hidden"); }
   $("itemModal").classList.remove("hidden");
 }
 
 function closeItemModal() {
-  $("itemModal").classList.add("hidden");
-  $("itemModal").classList.remove("flex");
+  const m = document.getElementById("itemModal");
+  if (!m) return;
+  m.classList.add("hidden");
+  m.classList.remove("flex");
+  m.style.display = "none";
 }
 
 async function saveItem(e) {
@@ -1635,8 +1636,11 @@ async function openRequestModal() {
   $("requestModal").classList.add("flex");
 }
 function closeRequestModal() {
-  $("requestModal").classList.add("hidden");
-  $("requestModal").classList.remove("flex");
+  const m = document.getElementById("requestModal");
+  if (!m) return;
+  m.classList.add("hidden");
+  m.classList.remove("flex");
+  m.style.display = "none";
 }
 function showReqTab() {
   if ($("panelReq")) $("panelReq").classList.remove("hidden");
@@ -1895,8 +1899,11 @@ async function openUserManager() {
 }
 
 function closeUserManager() {
-  $("userManagerModal").classList.add("hidden");
-  $("userManagerModal").classList.remove("flex");
+  const m = document.getElementById("userManagerModal");
+  if (!m) return;
+  m.classList.add("hidden");
+  m.classList.remove("flex");
+  m.style.display = "none";
 }
 
 async function loadLocationsListModal() {
@@ -1919,7 +1926,7 @@ async function loadLocationsListModal() {
 
 async function createLocation(e) {
   e.preventDefault();
-  if (!isManager()) return;
+  if (!canManageUsers()) return;
   const name = $("newLocationName").value.trim();
   if (!name) return;
 
@@ -1938,7 +1945,7 @@ async function createLocation(e) {
 }
 
 async function deleteLocation(name) {
-  if (!isManager()) return;
+  if (!canManageUsers()) return;
   if (confirm(`Are you sure you want to delete depot "${name}"?`)) {
     const { error } = await db.rpc('delete_location', {
       p_actor_username: currentUser.username,
@@ -1987,23 +1994,29 @@ async function loadAccountsListModal() {
   if (data) {
     data.forEach(u => {
       const div = document.createElement("div");
-      div.className = "flex justify-between items-center bg-slate-50 border p-2 rounded-lg text-xs";
-      div.innerHTML = `
-        <div><b>${u.username}</b> (${u.name}) - <span class="text-brand-600">${u.role}</span> @ <span class="font-semibold">${u.location}</span>
-        ${u.disabled ? ' <span class="text-rose-600">(Disabled)</span>' : ''}</div>
-        <div class="flex items-center gap-2">
-          <button onclick="openEditUserModal(${u.id}, '${u.username}', '${(u.name || '').replace(/'/g, "\\'")}', '${u.role}', '${u.location}')" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-2 py-1 rounded font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
-          ${u.username !== 'admin' ? `<button onclick="toggleUser(${u.id}, ${u.disabled})" class="${u.disabled ? 'text-emerald-600' : 'text-rose-600'} font-bold hover:underline">${u.disabled ? 'Enable' : 'Disable'}</button>` : ''}
-        </div>
-      `;
+      div.className = "flex justify-between items-center bg-slate-50 border p-2 rounded-lg text-xs gap-2";
+      const safeName = String(u.name || "").replace(/'/g, "");
+      const isDisabled = u.disabled === true;
+      div.innerHTML =
+        "<div><b>" + u.username + "</b> (" + (u.name||"") + ") - <span class='text-brand-600'>" + u.role + "</span> @ <span class='font-semibold'>" + (u.location||"") + "</span>" +
+        (isDisabled ? " <span class='text-rose-600'>(Disabled)</span>" : "") + "</div>" +
+        "<div class='flex items-center gap-2 flex-wrap'>" +
+        "<button type='button' class='bg-purple-100 hover:bg-purple-200 text-purple-800 px-2 py-1 rounded font-bold text-[10px] btn-edit-user'>Edit</button>" +
+        "<button type='button' class='font-bold hover:underline text-[10px] btn-toggle-user " + (isDisabled ? "text-emerald-600" : "text-amber-700") + "'>" + (isDisabled ? "Enable" : "Disable") + "</button>" +
+        (u.username === "admin" ? "" : "<button type='button' class='text-rose-600 font-bold hover:underline text-[10px] btn-del-user'>Delete</button>") +
+        "</div>";
       container.appendChild(div);
+      div.querySelector(".btn-edit-user").onclick = () => openEditUserModal(u.id, u.username, safeName, u.role, u.location);
+      div.querySelector(".btn-toggle-user").onclick = () => toggleUser(u.id, isDisabled);
+      const del = div.querySelector(".btn-del-user");
+      if (del) del.onclick = () => deleteUserAccount(u.id, u.username);
     });
   }
 }
 
 async function createAccount(e) {
   e.preventDefault();
-  if (!isManager()) return;
+  if (!canManageUsers()) return;
   const username = $("newUsername").value.trim();
   const name = $("newDisplayName").value.trim();
   const password = $("newPassword").value.trim();
@@ -2037,18 +2050,50 @@ async function createAccount(e) {
 }
 
 async function toggleUser(id, currentStatus) {
-  if (!isManager()) return;
-  const { error } = await db.rpc('toggle_store_user', {
-    p_actor_username: currentUser.username,
-    p_user_id: id,
-    p_disabled: !currentStatus
-  });
-  if (error) {
-    alert("Error: " + error.message);
-    return;
+  if (!canManageUsers()) return;
+  const newDisabled = !currentStatus;
+  try {
+    let error = null;
+    try {
+      const res = await db.rpc("toggle_store_user", {
+        p_actor_username: currentUser.username,
+        p_user_id: id,
+        p_disabled: newDisabled
+      });
+      error = res.error;
+    } catch (e) { error = e; }
+    if (error) {
+      const res2 = await db.from("store_users").update({ disabled: newDisabled }).eq("id", id);
+      if (res2.error) throw res2.error;
+    }
+    await loadAccountsListModal();
+    showSaveStatus(newDisabled ? "Account disabled" : "Account enabled");
+  } catch (err) {
+    alert("Could not update account: " + (err.message || err));
   }
-  await loadAccountsListModal();
 }
+
+async function deleteUserAccount(id, username) {
+  if (!canManageUsers()) return;
+  if (!confirm("Permanently delete account \"" + username + "\"?")) return;
+  try {
+    // Prefer RPC if exists; fallback direct delete
+    let error = null;
+    try {
+      const res = await db.rpc("delete_store_user", { p_actor_username: currentUser.username, p_user_id: id });
+      error = res.error;
+    } catch (e) { error = e; }
+    if (error) {
+      const res2 = await db.from("store_users").delete().eq("id", id);
+      if (res2.error) throw res2.error;
+    }
+    await loadAccountsListModal();
+    showSaveStatus("Account deleted");
+  } catch (err) {
+    alert("Could not delete account: " + (err.message || err));
+  }
+}
+
 
 async function openEditUserModal(userId, username, fullName, role, location) {
   if (!isManager()) return;
@@ -2070,7 +2115,7 @@ function closeEditUserModal() {
 
 async function saveUserEdits(e) {
   e.preventDefault();
-  if (!isManager()) return;
+  if (!canManageUsers()) return;
   const id = Number($("editUserId").value);
   const name = $("editUserFullName").value.trim();
   const role = $("editUserRole").value;
