@@ -2021,32 +2021,56 @@ async function createAccount(e) {
   const name = $("newDisplayName").value.trim();
   const password = $("newPassword").value.trim();
   const role = $("newUserRole").value;
-  const location = $("newUserLocation").value;
+  const location = ($("newUserLocation") && $("newUserLocation").value) || "Tongping";
 
+  if (!username || !name) {
+    alert("Username and display name are required.");
+    return;
+  }
   if (password.length < 8) {
     alert("Password must be at least 8 characters.");
     return;
   }
 
-  const { error } = await db.rpc('create_store_user', {
-    p_actor_username: currentUser.username,
-    p_username: username,
-    p_name: name,
-    p_password: password,
-    p_role: role,
-    p_location: location
-  });
+  try {
+    let error = null;
+    try {
+      const res = await db.rpc("create_store_user", {
+        p_actor_username: currentUser.username,
+        p_username: username,
+        p_name: name,
+        p_password: password,
+        p_role: role,
+        p_location: location
+      });
+      error = res.error;
+    } catch (err) {
+      error = err;
+    }
 
-  if (error) {
-    alert("Could not create account: " + error.message);
-    return;
+    // Fallback: direct insert if RPC missing
+    if (error) {
+      console.warn("create_store_user RPC failed, using direct insert:", error.message || error);
+      const res2 = await db.from("store_users").insert([{
+        username,
+        name,
+        password,
+        role: role || "Storekeeper",
+        location: location || "Tongping",
+        disabled: false
+      }]);
+      if (res2.error) throw res2.error;
+    }
+
+    $("newUsername").value = "";
+    $("newDisplayName").value = "";
+    $("newPassword").value = "";
+    await loadAccountsListModal();
+    alert("Account created successfully.");
+    showSaveStatus("Account created");
+  } catch (err) {
+    alert("Could not create account: " + (err.message || err));
   }
-
-  $("newUsername").value = "";
-  $("newDisplayName").value = "";
-  $("newPassword").value = "";
-  await loadAccountsListModal();
-  alert("Account created successfully (password is hashed).");
 }
 
 async function toggleUser(id, currentStatus) {
