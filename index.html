@@ -542,13 +542,14 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let activeLocation = "Tongping";
-let reqCart = []; // multi-item requisition lines
+let reqCart = [];
 let currentActiveCategory = "All";
 let saveStatusTimer = null;
 let currentItems = [];
 let allLocationsList = [];
 let isOnline = navigator.onLine;
 let isSyncing = false;
+let syncPromise = null;
 
 const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
 const CACHE_KEY_PREFIX = "gas_inv_";
@@ -558,7 +559,7 @@ const $ = id => document.getElementById(id);
 const isAdmin = () => !!currentUser && (currentUser.role === "Admin" || currentUser.username === "admin");
 const isManager = () => !!currentUser && (currentUser.role === "Manager" || isAdmin());
 const canApprove = () => isAdmin() || (!!currentUser && currentUser.role === "Manager");
-const canEditInventory = () => isAdmin(); // only Admin can edit stock/items
+const canEditInventory = () => isAdmin();
 const canManageUsers = () => isAdmin();
 
 function localDateString(date = new Date()) {
@@ -572,6 +573,14 @@ function dateKey() { return $("selectedDate").value || localDateString(); }
 
 function cacheKey(loc, date) {
   return `${CACHE_KEY_PREFIX}${loc}__${date}`;
+}
+
+/** Numeric ascending sort for item codes (1, 2, 3…) */
+function numericItemSort(a, b) {
+  const na = /^\d+$/.test(a.item_code) ? parseInt(a.item_code, 10) : Infinity;
+  const nb = /^\d+$/.test(b.item_code) ? parseInt(b.item_code, 10) : Infinity;
+  if (na !== nb) return na - nb;
+  return a.item_code.localeCompare(b.item_code);
 }
 
 function updateConnectionBadge() {
@@ -589,10 +598,8 @@ function updateConnectionBadge() {
   }
 }
 
-/** Active connectivity check against Supabase (more reliable than navigator.onLine alone) */
 async function checkConnectivity() {
   try {
-    // Lightweight HEAD-style request with short timeout
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
     const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
@@ -602,7 +609,7 @@ async function checkConnectivity() {
       cache: "no-store"
     });
     clearTimeout(timeout);
-    const online = res.ok || res.status === 400 || res.status === 401; // any response means reachable
+    const online = res.ok || res.status === 400 || res.status === 401;
     if (online !== isOnline) {
       isOnline = online;
       updateConnectionBadge();
@@ -618,36 +625,58 @@ async function checkConnectivity() {
   }
 }
 
+/* ============================================================
+   RELIABLE SYNC ENGINE
+   ============================================================ */
+
 async function getSyncQueue() {
   try {
     const q = await idbKeyval.get(QUEUE_KEY);
     return Array.isArray(q) ? q : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 async function setSyncQueue(queue) {
   await idbKeyval.set(QUEUE_KEY, queue);
 }
 
+function makeDedupeKey(m) {
+  if (m.type === 'upsert') {
+    return `upsert|${m.payload.p_location}|${m.payload.p_entry_date}|${m.payload.p_item_code}`;
+  }
+  if (m.type === 'delete') {
+    return `delete|${m.payload.p_item_code}`;
+  }
+  if (m.type === 'transfer') {
+    return `transfer|${m.payload.p_from_location}|${m.payload.p_to_location}|${m.payload.p_item_code}|${m.payload.p_transfer_date}`;
+  }
+  if (m.type === 'request') {
+    return `request|${m.payload.request_date}|${m.payload.location}|${m.payload.item_code}|${m.payload.memo_reference}`;
+  }
+  return `${m.type}|${crypto.randomUUID()}`;
+}
+
 async function enqueueMutation(mutation) {
   const queue = await getSyncQueue();
-  queue.push({
+  const newMut = {
     ...mutation,
     id: crypto.randomUUID(),
-    createdAt: Date.now()
-  });
+    dedupeKey: makeDedupeKey(mutation),
+    createdAt: Date.now(),
+    attempts: 0,
+    nextRetryAt: 0
+  };
+  const idx = queue.findIndex(m => m.dedupeKey === newMut.dedupeKey);
+  if (idx >= 0) queue[idx] = newMut;
+  else queue.push(newMut);
   await setSyncQueue(queue);
   showSaveStatus("Queued offline");
+  setTimeout(() => processSyncQueue(), 500);
 }
 
 async function cacheInventory(loc, date, items) {
   try {
-    await idbKeyval.set(cacheKey(loc, date), {
-      items,
-      cachedAt: Date.now()
-    });
+    await idbKeyval.set(cacheKey(loc, date), { items, cachedAt: Date.now() });
   } catch (e) {
     console.warn("Cache write failed", e);
   }
@@ -656,64 +685,82 @@ async function cacheInventory(loc, date, items) {
 async function loadCachedInventory(loc, date) {
   try {
     const cached = await idbKeyval.get(cacheKey(loc, date));
-    if (cached && Array.isArray(cached.items)) {
-      return cached.items;
-    }
+    if (cached && Array.isArray(cached.items)) return cached.items;
   } catch {}
   return null;
 }
 
 async function processSyncQueue() {
-  if (!isOnline || isSyncing || !currentUser) return;
-  isSyncing = true;
-  updateConnectionBadge();
+  if (syncPromise) return syncPromise;
+  if (!isOnline || !currentUser) return;
 
-  let queue = await getSyncQueue();
-  const now = Date.now();
-  // Drop expired entries older than 5 hours
-  queue = queue.filter(m => (now - m.createdAt) <= FIVE_HOURS_MS);
-  await setSyncQueue(queue);
-
-  if (queue.length === 0) {
-    isSyncing = false;
-    updateConnectionBadge();
-    return;
-  }
-
-  const remaining = [];
-  for (const mut of queue) {
+  syncPromise = (async () => {
     try {
-      if (mut.type === "upsert") {
-        const { error } = await db.rpc("secure_upsert_inventory", mut.payload);
-        if (error) throw error;
-      } else if (mut.type === "delete") {
-        const { error } = await db.rpc("delete_master_item", mut.payload);
-        if (error) throw error;
-      } else if (mut.type === "transfer") {
-        const { error } = await db.rpc("transfer_stock", mut.payload);
-        if (error) throw error;
-      } else if (mut.type === "request") {
-        const { error } = await db.from("store_requests").insert([mut.payload]);
-        if (error) throw error;
+      isSyncing = true;
+      updateConnectionBadge();
+
+      let queue = await getSyncQueue();
+      const now = Date.now();
+      queue = queue.filter(m => (now - m.createdAt) <= FIVE_HOURS_MS);
+      const ready = queue.filter(m => (m.nextRetryAt || 0) <= now);
+      const waiting = queue.filter(m => (m.nextRetryAt || 0) > now);
+
+      if (ready.length === 0) {
+        await setSyncQueue(queue);
+        isSyncing = false;
+        updateConnectionBadge();
+        return;
       }
-      // success – do not keep
-    } catch (err) {
-      console.error("Sync mutation failed", mut, err);
-      remaining.push(mut); // retry later
+
+      const stillFailing = [];
+      for (const mut of ready) {
+        try {
+          if (mut.type === "upsert") {
+            const { error } = await db.rpc("secure_upsert_inventory", mut.payload);
+            if (error) throw error;
+          } else if (mut.type === "delete") {
+            const { error } = await db.rpc("delete_master_item", mut.payload);
+            if (error) throw error;
+          } else if (mut.type === "transfer") {
+            const { error } = await db.rpc("transfer_stock", mut.payload);
+            if (error) throw error;
+          } else if (mut.type === "request") {
+            const { error } = await db.from("store_requests").insert([mut.payload]);
+            if (error) throw error;
+          }
+        } catch (err) {
+          console.error("Sync mutation failed", mut, err);
+          const attempts = (mut.attempts || 0) + 1;
+          const backoff = Math.min(2000 * Math.pow(2, attempts - 1), 60000);
+          stillFailing.push({ ...mut, attempts, nextRetryAt: Date.now() + backoff });
+        }
+      }
+
+      const remaining = [...waiting, ...stillFailing];
+      await setSyncQueue(remaining);
+
+      isSyncing = false;
+      updateConnectionBadge();
+
+      if (remaining.length === 0) {
+        showSaveStatus("All changes synced");
+        if (currentUser) loadCloudData();
+      } else {
+        showSaveStatus(`${remaining.length} change(s) pending – retrying…`);
+        const soonest = Math.min(...remaining.map(m => m.nextRetryAt || Date.now()));
+        const delay = Math.max(500, soonest - Date.now());
+        setTimeout(() => processSyncQueue(), delay);
+      }
+    } catch (e) {
+      console.error("Sync engine crashed:", e);
+      isSyncing = false;
+      updateConnectionBadge();
+    } finally {
+      syncPromise = null;
     }
-  }
+  })();
 
-  await setSyncQueue(remaining);
-  isSyncing = false;
-  updateConnectionBadge();
-
-  if (remaining.length === 0) {
-    showSaveStatus("All changes synced");
-    // Refresh current view
-    if (currentUser) loadCloudData();
-  } else {
-    showSaveStatus(`${remaining.length} change(s) pending`);
-  }
+  return syncPromise;
 }
 
 function setupOfflineListeners() {
@@ -727,16 +774,16 @@ function setupOfflineListeners() {
     updateConnectionBadge();
   });
 
-  // Initial state + active probe
   updateConnectionBadge();
-  checkConnectivity().then(ok => {
-    if (ok) setTimeout(() => processSyncQueue(), 1200);
-  });
+  checkConnectivity().then(ok => { if (ok) setTimeout(() => processSyncQueue(), 1200); });
 
-  // Periodic real-time check every 15 seconds
-  setInterval(() => {
-    checkConnectivity();
-  }, 15000);
+  setInterval(() => { checkConnectivity(); }, 15000);
+
+  setInterval(async () => {
+    if (!isOnline || !currentUser) return;
+    const q = await getSyncQueue();
+    if (q.length > 0) processSyncQueue();
+  }, 30000);
 }
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -797,10 +844,10 @@ function bindEvents() {
   });
   $("itemForm").addEventListener("submit", saveItem);
   $("deleteItemBtn").addEventListener("click", deleteItem);
-    $("itemTargetLocation").addEventListener("change", loadStockDataForModalLocation);
+  $("itemTargetLocation").addEventListener("change", loadStockDataForModalLocation);
 
   $("transferForm").addEventListener("submit", executeTransfer);
-    if ($("requestForm")) $("requestForm").addEventListener("submit", e => e.preventDefault());
+  if ($("requestForm")) $("requestForm").addEventListener("submit", e => e.preventDefault());
   if ($("closeRequestX")) $("closeRequestX").addEventListener("click", closeRequestModal);
   if ($("closeItemX")) $("closeItemX").addEventListener("click", closeItemModal);
   if ($("cancelItemBtn")) $("cancelItemBtn").addEventListener("click", closeItemModal);
@@ -812,10 +859,12 @@ function bindEvents() {
   if ($("closeReorderBtn")) $("closeReorderBtn").addEventListener("click", closeReorderModal);
   if ($("closeTransferX")) $("closeTransferX").addEventListener("click", closeTransferModal);
   if ($("cancelTransferBtn")) $("cancelTransferBtn").addEventListener("click", closeTransferModal);
-  if ($("closeAuditX"))   $("generateAuditBtn").addEventListener("click", generateAuditReport);
-    $("locationForm").addEventListener("submit", createLocation);
+  if ($("closeAuditX")) $("closeAuditX").addEventListener("click", closeAuditModal);
+  if ($("generateAuditBtn")) $("generateAuditBtn").addEventListener("click", generateAuditReport);
+  $("locationForm").addEventListener("submit", createLocation);
   $("userForm").addEventListener("submit", createAccount);
-  }
+  if ($("editUserForm")) $("editUserForm").addEventListener("submit", saveUserEdits);
+}
 
 async function handleLogin(e) {
   e.preventDefault();
@@ -824,7 +873,6 @@ async function handleLogin(e) {
   const errorEl = document.getElementById("loginError");
   if (errorEl) { errorEl.classList.add("hidden"); errorEl.textContent = ""; }
 
-  // LOCAL browser accounts – work even if Supabase is down
   const LOCAL_USERS = [
     { id: 1, username: "admin", password: "admin2026", name: "System Administrator", role: "Admin", location: "Tongping" },
     { id: 3, username: "store_tongping", password: "juba2026", name: "Tongping Storekeeper", role: "Storekeeper", location: "Tongping" },
@@ -832,7 +880,6 @@ async function handleLogin(e) {
   ];
   let row = LOCAL_USERS.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password) || null;
 
-  // Optional Supabase lookup
   if (!row) {
     try {
       const { data, error } = await db.from("store_users")
@@ -868,11 +915,10 @@ async function handleLogin(e) {
   if (badge) badge.textContent = "Tongping";
 
   const admin = isAdmin();
-  const mgr = canApprove(); // Manager or Admin
+  const mgr = canApprove();
   const show = (id, on) => { const el = document.getElementById(id); if (!el) return; el.classList.toggle("hidden", !on); };
   show("managerLocationBox", false);
   show("transferBtn", false);
-  // Admin only – full control
   show("newItemBtn", admin);
   show("healTodayBtn", admin);
   show("manageUsersBtn", admin);
@@ -882,7 +928,6 @@ async function handleLogin(e) {
   show("restoreLabel", admin);
   show("resetStockBtn", admin);
   show("batchDeleteBtn", admin);
-  // Manager + Admin – reports & approvals
   show("auditReportBtn", mgr);
 
   try { await loadLocations(); } catch (e) { console.warn(e); }
@@ -894,7 +939,6 @@ async function loadLocations() {
   if (data && data.length) {
     allLocationsList = ["Tongping"];
     
-    // Populate location selectors
     ["locationSelector", "itemTargetLocation", "transferFromLoc", "transferToLoc", "newUserLocation", "editUserLocation"].forEach(id => {
       const select = $(id);
       if (select) {
@@ -914,7 +958,6 @@ async function loadLocations() {
   }
 }
 
-
 async function loadCloudData() {
   if (!currentUser) return;
   const date = dateKey();
@@ -922,22 +965,29 @@ async function loadCloudData() {
 
   if (isOnline) {
     try {
+      // 1) If today is empty, carry forward yesterday's closing into today's opening
+      const { data: existing } = await db.from('inventory_entries')
+        .select('id')
+        .eq('location', activeLocation)
+        .eq('entry_date', date)
+        .limit(1);
+
+      if (!existing || existing.length === 0) {
+        showSaveStatus("Carrying forward yesterday…", true);
+        const { error: cfErr } = await db.rpc('carry_forward_day', {
+          p_username: currentUser.username,
+          p_location: activeLocation,
+          p_to_date: date
+        });
+        if (cfErr) console.warn('carry_forward_day failed:', cfErr.message);
+      }
+
+      // 2) Load today's rows
       let { data: dailyEntries, error } = await db.from('inventory_entries')
         .select('*')
         .eq('location', activeLocation)
         .eq('entry_date', date);
-
       if (error) throw error;
-
-      // Auto carry-forward only when the day is completely empty
-      if (!dailyEntries || dailyEntries.length === 0) {
-        await carryForwardFromPreviousDay(date);
-        const { data: refetched } = await db.from('inventory_entries')
-          .select('*')
-          .eq('location', activeLocation)
-          .eq('entry_date', date);
-        dailyEntries = refetched || [];
-      }
 
       currentItems = (dailyEntries || []).map(entry => ({
         id: entry.id,
@@ -952,7 +1002,7 @@ async function loadCloudData() {
         price: Number(entry.price) || 0,
         min_stock: entry.min_stock != null ? Number(entry.min_stock) : 5,
         comments: entry.comments || ""
-      })).sort((a, b) => a.item_code.localeCompare(b.item_code));
+      })).sort(numericItemSort);
 
       await cacheInventory(activeLocation, date, currentItems);
     } catch (err) {
@@ -960,24 +1010,18 @@ async function loadCloudData() {
       isOnline = false;
       updateConnectionBadge();
       const cached = await loadCachedInventory(activeLocation, date);
-      currentItems = cached || [];
+      currentItems = (cached || []).sort(numericItemSort);
     }
   } else {
     const cached = await loadCachedInventory(activeLocation, date);
-    if (cached) {
-      currentItems = cached;
-      showSaveStatus("Loaded from offline cache");
-    } else {
-      currentItems = [];
-      showSaveStatus("No offline data for this date");
-    }
+    currentItems = cached ? cached.sort(numericItemSort) : [];
+    showSaveStatus(cached ? "Loaded from offline cache" : "No offline data for this date");
   }
 
   renderTable();
   updateKPIs();
 }
 
-/** Robust batched carry-forward (used by auto day-open and Heal button) */
 async function carryForwardFromPreviousDay(targetDate, onlyMissingCodes = null) {
   const prevDate = new Date(targetDate + "T12:00:00");
   prevDate.setDate(prevDate.getDate() - 1);
@@ -994,7 +1038,6 @@ async function carryForwardFromPreviousDay(targetDate, onlyMissingCodes = null) 
     return { ok: 0, failed: [] };
   }
 
-  // Only process the missing codes if a list was supplied
   if (onlyMissingCodes && onlyMissingCodes.length) {
     const set = new Set(onlyMissingCodes);
     prevData = prevData.filter(p => set.has(p.item_code));
@@ -1043,7 +1086,6 @@ async function carryForwardFromPreviousDay(targetDate, onlyMissingCodes = null) 
     showSaveStatus(`Carried ${ok}/${prevData.length}…`);
   }
 
-  // Queue any remaining failures so the normal offline sync can retry them
   for (const p of failed) {
     const opening = Number(p.opening) + Number(p.added) - Number(p.issues);
     await enqueueMutation({
@@ -1075,10 +1117,6 @@ async function carryForwardFromPreviousDay(targetDate, onlyMissingCodes = null) 
   return { ok, failed: failed.map(p => p.item_code) };
 }
 
-/**
- * Permanent “Heal Today” button handler.
- * Safely finds items that exist yesterday but are missing today and carries only those.
- */
 async function healTodayInventory() {
   if (!currentUser || !isOnline) {
     alert("You must be online and logged in to heal today’s inventory.");
@@ -1116,13 +1154,13 @@ async function healTodayInventory() {
 
     if (missing.length === 0) {
       showSaveStatus("No missing items – today is complete");
-      alert("Today already has every item that existed yesterday.\\nNothing to heal.");
+      alert("Today already has every item that existed yesterday.\nNothing to heal.");
       return;
     }
 
     const confirmMsg =
-      `Found ${missing.length} missing item(s) from yesterday.\\n\\n` +
-      `Missing codes: ${missing.slice(0, 15).join(", ")}${missing.length > 15 ? " …" : ""}\\n\\n` +
+      `Found ${missing.length} missing item(s) from yesterday.\n\n` +
+      `Missing codes: ${missing.slice(0, 15).join(", ")}${missing.length > 15 ? " …" : ""}\n\n` +
       `Carry them forward now?`;
 
     if (!confirm(confirmMsg)) return;
@@ -1131,8 +1169,8 @@ async function healTodayInventory() {
     await loadCloudData();
 
     alert(
-      `Heal complete.\\n\\n` +
-      `Successfully added: ${result.ok}\\n` +
+      `Heal complete.\n\n` +
+      `Successfully added: ${result.ok}\n` +
       `Queued for retry: ${result.failed.length}`
     );
   } catch (err) {
@@ -1141,7 +1179,6 @@ async function healTodayInventory() {
     alert("Heal failed: " + (err.message || err));
   }
 }
-
 
 function renderTable() {
   const tbody = $("tableBody");
@@ -1173,7 +1210,6 @@ function renderTable() {
     tr.className = "hover:bg-slate-50";
     tr.dataset.code = item.item_code;
 
-    // Helper for inline editable cell (Admin only)
     const cell = (field, value, opts = {}) => {
       if (!admin) {
         return `<td class="p-3 ${opts.align || 'text-center'} ${opts.extraClass || ''}">${opts.prefix || ''}${value}${opts.suffix || ''}</td>`;
@@ -1212,7 +1248,6 @@ function renderTable() {
     tbody.appendChild(tr);
   });
 
-  // Bind inline save for Admin
   if (admin) {
     tbody.querySelectorAll("input[data-field]").forEach(inp => {
       inp.addEventListener("blur", onInlineFieldBlur);
@@ -1223,7 +1258,6 @@ function renderTable() {
   }
 }
 
-/** Save a single field changed inline in the table (Admin only) */
 async function onInlineFieldBlur(e) {
   const inp = e.target;
   const code = inp.dataset.code;
@@ -1233,7 +1267,6 @@ async function onInlineFieldBlur(e) {
   const item = currentItems.find(i => i.item_code === code);
   if (!item) return;
 
-  // Normalize number fields
   if (["opening","added","issues","cost","price","min_stock"].includes(field)) {
     value = Number(value);
     if (isNaN(value) || value < 0) {
@@ -1242,13 +1275,11 @@ async function onInlineFieldBlur(e) {
     }
   }
 
-  // No change?
   if (Number(item[field]) === value) return;
 
   const oldVal = item[field];
-  item[field] = value; // optimistic
+  item[field] = value;
 
-  // Re-render KPIs quickly
   updateKPIs();
 
   try {
@@ -1273,7 +1304,6 @@ async function onInlineFieldBlur(e) {
         }
       });
       showSaveStatus("Queued offline");
-      // Refresh closing display
       renderTable();
       return;
     }
@@ -1296,16 +1326,15 @@ async function onInlineFieldBlur(e) {
     });
     if (error) throw error;
     showSaveStatus("Saved");
-    renderTable(); // refresh closing / low-stock colour
+    renderTable();
   } catch (err) {
     console.error("Inline save failed", err);
-    item[field] = oldVal; // rollback
+    item[field] = oldVal;
     showSaveStatus("Save failed");
     alert("Could not save change: " + (err.message || err));
     renderTable();
   }
 }
-
 
 function updateKPIs() {
   let totalIssues = 0, totalRevenue = 0, lowStock = 0;
@@ -1330,12 +1359,11 @@ function openEditItemModal(id) {
   const item = currentItems.find(i => i.id === id);
   if (!item) return;
 
-  const manager = canEditInventory(); // Admin only
+  const manager = canEditInventory();
   $("modalTitle").textContent = manager ? `Edit Item: ${item.description}` : `Log Stock for: ${item.description}`;
   $("itemId").value = item.item_code;
   $("originalItemCode").value = item.item_code;
 
-  // Only Admin can change the global Item ID
   $("itemId").readOnly = !manager;
   $("itemId").className = manager
     ? "w-full bg-white border border-brand-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-800"
@@ -1353,7 +1381,6 @@ function openEditItemModal(id) {
   $("itemIssues").value = item.issues;
   $("itemComments").value = item.comments || "";
 
-  // Min stock – Admin only
   if ($("itemMinStock")) {
     $("itemMinStock").value = (item.min_stock != null ? item.min_stock : 5);
   }
@@ -1370,7 +1397,6 @@ function openEditItemModal(id) {
     $("deleteItemBtn").classList.add("hidden");
   }
 
-  // Non-admin can still log quantities
   $("itemOpening").readOnly = false;
   $("itemAdded").readOnly = false;
   $("itemIssues").readOnly = false;
@@ -1379,17 +1405,14 @@ function openEditItemModal(id) {
   $("itemModal").classList.add("flex");
 }
 
-
 async function openNewItemModal() {
   if (!canEditInventory()) return;
 
-  // Fetch next sequential item code from server
   let nextCode = "001";
   try {
     const { data, error } = await db.rpc('get_next_item_code');
     if (!error && data) nextCode = String(data).padStart(3, "0");
   } catch (e) {
-    // Fallback: compute max numeric code client-side
     const nums = currentItems
       .map(i => parseInt(i.item_code, 10))
       .filter(n => !isNaN(n));
@@ -1399,8 +1422,7 @@ async function openNewItemModal() {
 
   $("modalTitle").textContent = "Add New Master Item (appears in ALL depots)";
   $("itemId").value = nextCode;
-  $("originalItemCode").value = ""; // empty = new item
-  // Keep sequential suggestion but allow Admin override
+  $("originalItemCode").value = "";
   $("itemId").readOnly = false;
   $("itemId").className = "w-full bg-white border border-brand-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-800";
   $("itemIdHint").classList.remove("hidden");
@@ -1439,7 +1461,6 @@ async function saveItem(e) {
   const itemCode = $("itemId").value.trim();
   const originalCode = ($("originalItemCode").value || "").trim();
   const codeChanged = originalCode && originalCode !== itemCode;
-  // New item if we opened "New Item" (no original) or code not in current list
   const isNewItem = !originalCode || (!codeChanged && !currentItems.some(i => i.item_code === itemCode));
 
   if (!itemCode) {
@@ -1447,10 +1468,7 @@ async function saveItem(e) {
     return;
   }
 
-  // Prevent duplicate Item IDs (client-side guard)
-  const isNewItemCheck = !originalCode;
-  const codeChangedCheck = originalCode && originalCode !== itemCode;
-  if (isNewItemCheck || codeChangedCheck) {
+  if (!originalCode || codeChanged) {
     const duplicate = currentItems.some(i =>
       i.item_code === itemCode && i.item_code !== originalCode
     );
@@ -1461,7 +1479,6 @@ async function saveItem(e) {
     }
   }
 
-  // Global master fields – these must be identical in every depot
   const globalFields = {
     p_item_code: itemCode,
     p_description: $("itemDescription").value.trim(),
@@ -1479,13 +1496,11 @@ async function saveItem(e) {
     p_min_stock: (isAdmin() && $("itemMinStock")) ? (Number($("itemMinStock").value) || 5) : undefined
   };
 
-  // Quantities are location-specific
   const opening = Number($("itemOpening").value) || 0;
   const added   = Number($("itemAdded").value) || 0;
   const issues  = Number($("itemIssues").value) || 0;
 
   if (!isOnline) {
-    // Offline: only update the currently active location + queue the mutation
     const existingIdx = currentItems.findIndex(i => i.item_code === itemCode);
     const localItem = {
       id: existingIdx >= 0 ? currentItems[existingIdx].id : Date.now(),
@@ -1496,14 +1511,14 @@ async function saveItem(e) {
       opening, added, issues,
       cost: basePayload.p_cost,
       price: basePayload.p_price,
-      comments: basePayload.p_comments
+      comments: basePayload.p_comments,
+      min_stock: basePayload.p_min_stock ?? 5
     };
     if (existingIdx >= 0) currentItems[existingIdx] = localItem;
     else currentItems.push(localItem);
-    currentItems.sort((a, b) => a.item_code.localeCompare(b.item_code));
+    currentItems.sort(numericItemSort);
     await cacheInventory(activeLocation, dateKey(), currentItems);
 
-    // Queue a single upsert for the target location; backend will still cascade metadata
     await enqueueMutation({
       type: "upsert",
       payload: {
@@ -1522,12 +1537,9 @@ async function saveItem(e) {
     return;
   }
 
-  // ---------- ONLINE PATH ----------
   try {
-    // Ensure locations list is loaded
     if (!allLocationsList.length) await loadLocations();
 
-    // Manager changed the Item ID → rename globally first
     if (codeChanged && isManager()) {
       showSaveStatus("Changing Item ID globally…", true);
       const { error: renameErr } = await db.rpc("change_item_code", {
@@ -1554,7 +1566,6 @@ async function saveItem(e) {
       });
       showSaveStatus("New item created in " + (result.locations || "ALL") + " depot(s)");
     } else {
-      // Existing item or Storekeeper edit
       const { error } = await db.rpc('secure_upsert_inventory', {
         ...basePayload,
         p_location: targetLocation,
@@ -1567,17 +1578,15 @@ async function saveItem(e) {
     }
 
     closeItemModal();
-    loadCloudData();
+    await loadCloudData();
   } catch (err) {
     const msg = (err && err.message) ? err.message : String(err);
     console.error("Save error:", err);
 
-    // Network / "Failed to fetch" → treat as offline and queue
     if (/failed to fetch|networkerror|load failed|abort/i.test(msg) || !navigator.onLine) {
       isOnline = false;
       updateConnectionBadge();
 
-      // Optimistic local update + queue
       const existingIdx = currentItems.findIndex(i => i.item_code === itemCode);
       const localItem = {
         id: existingIdx >= 0 ? currentItems[existingIdx].id : Date.now(),
@@ -1588,11 +1597,12 @@ async function saveItem(e) {
         opening, added, issues,
         cost: basePayload.p_cost,
         price: basePayload.p_price,
-        comments: basePayload.p_comments
+        comments: basePayload.p_comments,
+        min_stock: basePayload.p_min_stock ?? 5
       };
       if (existingIdx >= 0) currentItems[existingIdx] = localItem;
       else currentItems.push(localItem);
-      currentItems.sort((a, b) => a.item_code.localeCompare(b.item_code));
+      currentItems.sort(numericItemSort);
       await cacheInventory(activeLocation, dateKey(), currentItems);
 
       await enqueueMutation({
@@ -1635,7 +1645,6 @@ async function deleteItem() {
     p_item_code: itemCode
   };
 
-  // Offline path
   if (!isOnline) {
     currentItems = currentItems.filter(i => i.item_code !== itemCode);
     await cacheInventory(activeLocation, dateKey(), currentItems);
@@ -1647,18 +1656,13 @@ async function deleteItem() {
     return;
   }
 
-  // Online path – try the dedicated RPC first, then fall back to direct delete
   try {
     let deleted = false;
-
-    // 1. Preferred: use the secure RPC
     const { error: rpcError } = await db.rpc("delete_master_item", payload);
     if (!rpcError) {
       deleted = true;
     } else {
       console.warn("delete_master_item RPC failed, falling back to direct delete:", rpcError.message);
-
-      // 2. Fallback: direct DELETE (works even if the RPC is missing)
       const { error: delError, count } = await db
         .from("inventory_entries")
         .delete({ count: "exact" })
@@ -1672,10 +1676,8 @@ async function deleteItem() {
     }
 
     if (deleted) {
-      // Clear local cache for the current view
       currentItems = currentItems.filter(i => i.item_code !== itemCode);
       await cacheInventory(activeLocation, dateKey(), currentItems);
-
       closeItemModal();
       showSaveStatus(`Item #${itemCode} deleted globally`);
       loadCloudData();
@@ -1702,17 +1704,12 @@ function showProgress(current, total, action) {
   showSaveStatus(`${action}: ${current} / ${total}`, true);
 }
 
-/**
- * Ensure an item exists in EVERY depot for the given date.
- * Tries atomic RPC first; if that fails, loops all known locations.
- */
 async function ensureItemInAllDepots({
   itemCode, description, category, unit,
   primaryLocation, opening, added, issues, cost, price, comments, entryDate
 }) {
   if (!allLocationsList.length) await loadLocations();
 
-  // Prefer single-transaction RPC
   const { error: rpcErr } = await db.rpc("create_item_all_locations", {
     p_username: currentUser.username,
     p_entry_date: entryDate || dateKey(),
@@ -1731,7 +1728,6 @@ async function ensureItemInAllDepots({
 
   if (!rpcErr) return { method: "rpc", locations: allLocationsList.length || "all" };
 
-  // Fallback: write to every location explicitly
   console.warn("create_item_all_locations failed, using per-depot fallback:", rpcErr.message);
   const locs = allLocationsList.length ? allLocationsList : [primaryLocation];
   let written = 0;
@@ -1761,6 +1757,34 @@ async function ensureItemInAllDepots({
   return { method: "loop", locations: written, errors };
 }
 
+async function loadStockDataForModalLocation() {
+  const loc = $("itemTargetLocation").value;
+  if (!loc || !currentUser) return;
+  try {
+    const itemCode = $("itemId").value.trim();
+    if (!itemCode) return;
+    const { data, error } = await db.from('inventory_entries')
+      .select('*')
+      .eq('location', loc)
+      .eq('entry_date', dateKey())
+      .eq('item_code', itemCode)
+      .limit(1);
+    if (error) throw error;
+    if (data && data.length) {
+      const row = data[0];
+      $("itemOpening").value = Number(row.opening) || 0;
+      $("itemAdded").value = Number(row.added) || 0;
+      $("itemIssues").value = Number(row.issues) || 0;
+    } else {
+      $("itemOpening").value = 0;
+      $("itemAdded").value = 0;
+      $("itemIssues").value = 0;
+    }
+  } catch (err) {
+    console.warn("loadStockDataForModalLocation failed:", err);
+  }
+}
+
 function filterCategory(cat) {
   currentActiveCategory = cat;
   document.querySelectorAll(".cat-btn").forEach(btn => {
@@ -1773,7 +1797,10 @@ function filterCategory(cat) {
   renderTable();
 }
 
-function setToday() { $("selectedDate").value = localDateString(); loadCloudData(); }
+function setToday() {
+  $("selectedDate").value = localDateString();
+  loadCloudData();
+}
 
 function changeDate(days) {
   const date = new Date(dateKey() + "T12:00:00");
@@ -1818,7 +1845,6 @@ function closeReorderModal() {
   $("reorderModal").classList.remove("flex");
 }
 
-// Inter-Depot Transfers
 async function openTransferModal() {
   if (!isManager()) return;
   $("transferDate").value = dateKey();
@@ -1875,7 +1901,6 @@ async function executeTransfer(e) {
   loadCloudData();
 }
 
-// Store Requisitions + Purchase Orders
 async function openRequestModal() {
   if ($("reqQty")) $("reqQty").value = "1";
   if ($("reqMemo")) $("reqMemo").value = "";
@@ -1896,6 +1921,7 @@ async function openRequestModal() {
   $("requestModal").classList.remove("hidden");
   $("requestModal").classList.add("flex");
 }
+
 function closeRequestModal() {
   const m = document.getElementById("requestModal");
   if (!m) return;
@@ -1903,18 +1929,21 @@ function closeRequestModal() {
   m.classList.remove("flex");
   m.style.display = "none";
 }
+
 function showReqTab() {
   if ($("panelReq")) $("panelReq").classList.remove("hidden");
   if ($("panelPO")) $("panelPO").classList.add("hidden");
   if ($("tabReq")) $("tabReq").className = "px-3 py-1.5 rounded-lg bg-emerald-600 text-white";
   if ($("tabPO")) $("tabPO").className = "px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700";
 }
+
 function showPOTab() {
   if ($("panelReq")) $("panelReq").classList.add("hidden");
   if ($("panelPO")) $("panelPO").classList.remove("hidden");
   if ($("tabPO")) $("tabPO").className = "px-3 py-1.5 rounded-lg bg-blue-600 text-white";
   if ($("tabReq")) $("tabReq").className = "px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700";
 }
+
 function addReqLine() {
   const code = $("reqItemCode").value;
   const qty = Number($("reqQty").value) || 0;
@@ -1927,6 +1956,7 @@ function addReqLine() {
   $("reqQty").value = "1";
   renderReqCart();
 }
+
 function renderReqCart() {
   const box = $("reqCartList");
   const cnt = $("reqCartCount");
@@ -1942,6 +1972,7 @@ function renderReqCart() {
   });
   box.querySelectorAll(".req-remove").forEach(btn => { btn.onclick = () => { reqCart.splice(Number(btn.dataset.idx), 1); renderReqCart(); }; });
 }
+
 async function submitReqBatch() {
   if (!reqCart.length) { alert("Add at least one item"); return; }
   const batchId = "REQ-" + Date.now().toString(36).toUpperCase();
@@ -1959,13 +1990,18 @@ async function submitReqBatch() {
     if (error) { alert("Error: " + error.message); return; }
     alert("Submitted " + rows.length + " line(s) for approval.\nBatch: " + batchId);
   }
-  reqCart = []; renderReqCart(); await loadRequestsList();
+  reqCart = [];
+  renderReqCart();
+  await loadRequestsList();
 }
+
 function clearReqCart() { reqCart = []; renderReqCart(); }
+
 function downloadReqCartPdf() {
   if (!reqCart.length) { alert("Cart is empty"); return; }
   printRequisitionPdf(reqCart, "DRAFT CART", currentUser ? currentUser.name : "");
 }
+
 function printRequisitionPdf(lines, statusLabel, byUser) {
   const w = window.open("", "_blank");
   if (!w) { alert("Allow pop-ups"); return; }
@@ -1978,14 +2014,17 @@ function printRequisitionPdf(lines, statusLabel, byUser) {
     "<table><thead><tr><th>#</th><th>Code</th><th>Description</th><th>Qty</th><th>Unit</th><th>Memo</th></tr></thead><tbody>"+rows+"</tbody></table>" +
     "<p style='margin-top:40px;font-size:11px'>Requested _____________ Manager approval _____________ Date ________</p>" +
     "<scr"+"ipt>window.onload=function(){window.print();}</scr"+"ipt></body></html>";
-  w.document.write(html); w.document.close();
+  w.document.write(html);
+  w.document.close();
 }
+
 async function approveRequest(id, status) {
   if (!canApprove()) return;
   if (!isOnline) { alert("Approval requires internet"); return; }
   const { error } = await db.from("store_requests").update({ status: status }).eq("id", id);
   if (error) alert(error.message); else { await loadRequestsList(); await loadPOList(); }
 }
+
 async function loadRequestsList() {
   let data = [];
   if (isOnline) {
@@ -2015,6 +2054,7 @@ async function loadRequestsList() {
     btn.onclick = () => approveRequest(btn.dataset.id, btn.dataset.act==="approve"?"Approved":"Rejected");
   });
 }
+
 async function submitPO() {
   const supplier = ($("poSupplier")&&$("poSupplier").value||"").trim();
   const items = ($("poItems")&&$("poItems").value||"").trim();
@@ -2039,6 +2079,7 @@ async function submitPO() {
   if ($("poCost")) $("poCost").value = "0";
   await loadPOList();
 }
+
 async function loadPOList() {
   const container = $("poList");
   if (!container) return;
@@ -2062,7 +2103,6 @@ async function loadPOList() {
     btn.onclick = async () => { await approveRequest(btn.dataset.id, btn.dataset.act==="approve"?"Approved":"Rejected"); };
   });
 }
-
 
 function openAuditModal() {
   if (!canApprove()) return;
@@ -2094,7 +2134,6 @@ async function generateAuditReport() {
     return;
   }
 
-  // Aggregate by item
   const aggregated = {};
   data.forEach(row => {
     if (!aggregated[row.item_code]) {
@@ -2133,7 +2172,7 @@ async function generateAuditReport() {
   `;
 
   const tbody = table.querySelector("tbody");
-  Object.values(aggregated).forEach(item => {
+  Object.values(aggregated).sort(numericItemSort).forEach(item => {
     const tr = document.createElement("tr");
     tr.className = "hover:bg-slate-50";
     tr.innerHTML = `
@@ -2150,7 +2189,6 @@ async function generateAuditReport() {
   container.appendChild(table);
 }
 
-// Depot & Account Manager
 async function openUserManager() {
   if (!canManageUsers()) return;
   await loadLocationsListModal();
@@ -2235,7 +2273,6 @@ async function loadAccountsListModal() {
   data = res.data;
   error = res.error;
 
-  // Fallback if RPC not deployed yet
   if (error) {
     console.warn("list_store_users missing, trying direct select:", error.message);
     const fb = await db.from('store_users').select('id, username, name, role, location, disabled').order('username');
@@ -2248,7 +2285,7 @@ async function loadAccountsListModal() {
   container.replaceChildren();
 
   if (error) {
-    container.innerHTML = `<div class="text-rose-600 text-xs p-2">Could not load accounts: ${error.message}<br><br>Run <b>FIX_USERS_AND_REQUESTS.sql</b> in Supabase SQL Editor, then refresh.</div>`;
+    container.innerHTML = `<div class="text-rose-600 text-xs p-2">Could not load accounts: ${error.message}<br><br>Run the SQL schema in Supabase SQL Editor, then refresh.</div>`;
     return;
   }
 
@@ -2309,7 +2346,6 @@ async function createAccount(e) {
       error = err;
     }
 
-    // Fallback: direct insert if RPC missing
     if (error) {
       console.warn("create_store_user RPC failed, using direct insert:", error.message || error);
       const res2 = await db.from("store_users").insert([{
@@ -2362,7 +2398,6 @@ async function deleteUserAccount(id, username) {
   if (!canManageUsers()) return;
   if (!confirm("Permanently delete account \"" + username + "\"?")) return;
   try {
-    // Prefer RPC if exists; fallback direct delete
     let error = null;
     try {
       const res = await db.rpc("delete_store_user", { p_actor_username: currentUser.username, p_user_id: id });
@@ -2378,7 +2413,6 @@ async function deleteUserAccount(id, username) {
     alert("Could not delete account: " + (err.message || err));
   }
 }
-
 
 async function openEditUserModal(userId, username, fullName, role, location) {
   if (!isManager()) return;
@@ -2449,10 +2483,6 @@ function exportCSV() {
   window.URL.revokeObjectURL(url);
 }
 
-/* ============================================================
-   MASTER EXCEL TEMPLATE – Download & Upload
-   ============================================================ */
-
 function downloadMasterTemplate() {
   if (!isManager()) return;
 
@@ -2470,7 +2500,6 @@ function downloadMasterTemplate() {
 
   const sampleData = [
     headers,
-    // Empty example row so users see the correct format
     ["", "", "Dry Food Items", "Kg", 0.00, 0.00, 0]
   ];
 
@@ -2510,7 +2539,7 @@ async function handleExcelUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  e.target.value = ""; // allow re-selecting the same file
+  e.target.value = "";
 
   if (!isOnline) {
     alert("Excel upload requires an internet connection.");
@@ -2518,7 +2547,6 @@ async function handleExcelUpload(e) {
   }
 
   try {
-    // Always refresh depot list before bulk create
     await loadLocations();
     if (!allLocationsList.length) {
       alert("No depots found. Add depots under Depots & Users first.");
@@ -2535,7 +2563,6 @@ async function handleExcelUpload(e) {
       return;
     }
 
-    // Normalise header names (case-insensitive)
     const normalised = rows.map(row => {
       const out = {};
       Object.keys(row).forEach(k => {
@@ -2549,7 +2576,6 @@ async function handleExcelUpload(e) {
     const errors = [];
     const total = normalised.length;
 
-    // No row limit – process every row with live progress
     for (let i = 0; i < total; i++) {
       const row = normalised[i];
       showProgress(i + 1, total, "Uploading");
@@ -2569,7 +2595,6 @@ async function handleExcelUpload(e) {
           continue;
         }
 
-        // Auto-generate sequential code if blank (001, 002, 003…)
         if (!itemCode) {
           const { data: nextCode, error } = await db.rpc("get_next_item_code");
           if (error) throw error;
@@ -2640,10 +2665,6 @@ async function handleExcelUpload(e) {
   }
 }
 
-/* ============================================================
-   BACKUP & RESTORE
-   ============================================================ */
-
 async function downloadInventoryBackup() {
   if (!isManager()) return;
   if (!isOnline) {
@@ -2654,7 +2675,6 @@ async function downloadInventoryBackup() {
   try {
     showSaveStatus("Building backup…");
 
-    // Fetch inventory for the selected date across ALL locations
     const { data, error } = await db
       .from("inventory_entries")
       .select("*")
@@ -2710,7 +2730,6 @@ async function downloadInventoryBackup() {
     ];
     XLSX.utils.book_append_sheet(wb, ws, "Inventory Backup");
 
-    // Instructions sheet
     const info = [
       ["GAS GENERAL STORE – INVENTORY BACKUP"],
       ["Generated: " + new Date().toISOString()],
@@ -2837,10 +2856,6 @@ async function handleInventoryRestore(e) {
   }
 }
 
-/* ============================================================
-   RESET STOCK – zero all quantities for selected date
-   ============================================================ */
-
 async function resetAllStock() {
   if (!canEditInventory()) return;
   if (!isOnline) {
@@ -2866,7 +2881,6 @@ async function resetAllStock() {
   }
 
   try {
-    // Optimistic UI: zero current table immediately
     currentItems = currentItems.map(i => ({
       ...i, opening: 0, added: 0, issues: 0, comments: ""
     }));
@@ -2987,7 +3001,6 @@ async function exportRequisitionsExcel() {
 }
 
 function exportRequisitionsPdf() {
-  // Print-friendly view of current request list
   const list = $("requestList");
   if (!list || !list.innerText.trim()) {
     alert("No requisitions loaded. Open the list first.");
@@ -3016,11 +3029,9 @@ function exportRequisitionsPdf() {
       <th>Item</th><th>Qty</th><th>Memo</th><th>Status</th><th>By</th>
     </tr></thead><tbody>`);
 
-  // Rebuild from last loaded DOM entries if possible, else parse list text
   const cards = list.querySelectorAll(":scope > div");
   if (cards.length) {
     cards.forEach(card => {
-      const html = card.innerHTML.replace(/"/g, "&quot;");
       w.document.write(`<tr><td colspan="5">${card.innerText.replace(/\n/g, " | ")}</td></tr>`);
     });
   } else {
@@ -3058,7 +3069,6 @@ async function batchDeleteSelected() {
   let ok = 0;
   let failed = 0;
 
-  // Prefer batch RPC
   try {
     showProgress(0, codes.length, "Deleting");
     const { data, error } = await db.rpc("delete_master_items_batch", {
@@ -3080,7 +3090,6 @@ async function batchDeleteSelected() {
     console.warn("Batch RPC unavailable, deleting one by one:", err.message || err);
   }
 
-  // Fallback with live progress
   for (let i = 0; i < codes.length; i++) {
     showProgress(i + 1, codes.length, "Deleting");
     try {
