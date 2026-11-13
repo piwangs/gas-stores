@@ -185,6 +185,7 @@
               <th class="p-3 text-center">Added</th>
               <th class="p-3 text-center">Issues</th>
               <th class="p-3 text-center">Closing</th>
+              <th class="p-3 text-center" title="Minimum stock level for alerts">Min</th>
               <th class="p-3 text-right">Cost Price</th>
               <th class="p-3 text-right">Sale Price</th>
               <th class="p-3 text-right">Est. Revenue</th>
@@ -257,9 +258,13 @@
           <div><label class="block text-xs font-semibold mb-1 text-slate-600">Stock Added</label><input id="itemAdded" type="number" min="0" step="any" value="0" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
           <div><label class="block text-xs font-semibold mb-1 text-slate-600">Daily Issues</label><input id="itemIssues" type="number" min="0" step="any" value="0" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-3 gap-3">
           <div><label class="block text-xs font-semibold mb-1 text-slate-600">Unit Cost ($)</label><input id="itemCost" type="number" min="0" step="0.01" value="0.00" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
           <div><label class="block text-xs font-semibold mb-1 text-slate-600">Selling Price ($)</label><input id="itemPrice" type="number" min="0" step="0.01" value="0.00" class="w-full border rounded-lg px-3 py-2 text-xs"></div>
+          <div id="minStockWrapper" class="hidden">
+            <label class="block text-xs font-semibold mb-1 text-slate-600">Min Stock (Alert)</label>
+            <input id="itemMinStock" type="number" min="0" step="1" value="5" class="w-full border border-amber-300 rounded-lg px-3 py-2 text-xs bg-amber-50" title="Admin only – triggers low-stock alert when closing ≤ this value">
+          </div>
         </div>
         <div><label class="block text-xs font-semibold mb-1 text-slate-600">Comments</label><input id="itemComments" maxlength="300" class="w-full border rounded-lg px-3 py-2 text-xs" placeholder="Notes..."></div>
         <div class="flex justify-between items-center pt-2">
@@ -945,6 +950,7 @@ async function loadCloudData() {
         issues: Number(entry.issues) || 0,
         cost: Number(entry.cost) || 0,
         price: Number(entry.price) || 0,
+        min_stock: entry.min_stock != null ? Number(entry.min_stock) : 5,
         comments: entry.comments || ""
       })).sort((a, b) => a.item_code.localeCompare(b.item_code));
 
@@ -1141,50 +1147,165 @@ function renderTable() {
   const tbody = $("tableBody");
   tbody.replaceChildren();
 
-  const search = $("searchInput").value.toLowerCase();
+  const search = ($("searchInput")?.value || "").toLowerCase();
   const filtered = currentItems.filter(item => {
     const matchesCat = currentActiveCategory === "All" || item.category === currentActiveCategory;
-    const matchesSearch = item.description.toLowerCase().includes(search) || item.item_code.toLowerCase().includes(search);
+    const matchesSearch = (item.description || "").toLowerCase().includes(search) ||
+                          (item.item_code || "").toLowerCase().includes(search);
     return matchesCat && matchesSearch;
   });
 
   if (!filtered.length) {
-    $("emptyState").classList.remove("hidden");
+    $("emptyState")?.classList.remove("hidden");
     return;
   }
-  $("emptyState").classList.add("hidden");
+  $("emptyState")?.classList.add("hidden");
+
+  const admin = isAdmin();
 
   filtered.forEach(item => {
     const closing = Number(item.opening) + Number(item.added) - Number(item.issues);
     const rev = Number(item.issues) * Number(item.price);
+    const minLvl = item.min_stock != null ? Number(item.min_stock) : 5;
+    const isLow = closing <= minLvl;
 
     const tr = document.createElement("tr");
     tr.className = "hover:bg-slate-50";
+    tr.dataset.code = item.item_code;
+
+    // Helper for inline editable cell (Admin only)
+    const cell = (field, value, opts = {}) => {
+      if (!admin) {
+        return `<td class="p-3 ${opts.align || 'text-center'} ${opts.extraClass || ''}">${opts.prefix || ''}${value}${opts.suffix || ''}</td>`;
+      }
+      const type = opts.type || "number";
+      const step = opts.step != null ? opts.step : (type === "number" ? "any" : undefined);
+      return `<td class="p-1 ${opts.align || 'text-center'}">
+        <input type="${type}" data-field="${field}" data-code="${item.item_code}"
+          value="${value}" ${step ? `step="${step}"` : ""} min="0"
+          class="w-full max-w-[90px] mx-auto text-center border border-transparent hover:border-slate-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-300 rounded px-1 py-1 text-xs bg-transparent focus:bg-white ${opts.extraClass || ''}"
+          title="Click to edit – changes save on blur">
+      </td>`;
+    };
+
     tr.innerHTML = `
       <td class="p-3 text-center">${isManager() ? `<input type="checkbox" class="item-check rounded" data-code="${item.item_code}">` : ''}</td>
       <td class="p-3 font-mono font-semibold text-slate-500">${item.item_code}</td>
       <td class="p-3 font-bold text-slate-800">${item.description}</td>
       <td class="p-3">${item.category}</td>
       <td class="p-3 text-center">${item.unit}</td>
-      <td class="p-3 text-center font-semibold">${item.opening}</td>
-      <td class="p-3 text-center text-emerald-600">+${item.added}</td>
-      <td class="p-3 text-center text-amber-600">-${item.issues}</td>
-      <td class="p-3 text-center font-extrabold ${closing <= 5 ? 'text-rose-600' : ''}">${closing}</td>
-      <td class="p-3 text-right font-mono">$${Number(item.cost).toFixed(2)}</td>
-      <td class="p-3 text-right font-mono">$${Number(item.price).toFixed(2)}</td>
+      ${cell("opening", item.opening)}
+      ${cell("added", item.added, { extraClass: "text-emerald-600" })}
+      ${cell("issues", item.issues, { extraClass: "text-amber-600" })}
+      <td class="p-3 text-center font-extrabold ${isLow ? 'text-rose-600' : ''}">${closing}</td>
+      ${admin ? cell("min_stock", minLvl, { extraClass: "text-slate-600" }) : `<td class="p-3 text-center text-slate-500">${minLvl}</td>`}
+      ${cell("cost", Number(item.cost).toFixed(2), { align: "text-right", step: "0.01" })}
+      ${cell("price", Number(item.price).toFixed(2), { align: "text-right", step: "0.01" })}
       <td class="p-3 text-right font-mono text-emerald-600">$${rev.toFixed(2)}</td>
       <td class="p-3 text-slate-500">${item.comments || '--'}</td>
       <td class="p-3 text-center">
-        <button onclick="openEditItemModal(${item.id})" class="bg-amber-100 hover:bg-amber-200 text-amber-800 px-2.5 py-1 rounded text-[10px] font-bold"><i class="fa-solid fa-pen mr-1"></i>${isManager() ? 'Edit' : 'Log Stock'}</button>
+        <button onclick="openEditItemModal(${item.id})" class="bg-amber-100 hover:bg-amber-200 text-amber-800 px-2.5 py-1 rounded text-[10px] font-bold">
+          <i class="fa-solid fa-pen mr-1"></i>${admin ? 'Edit' : 'Log Stock'}
+        </button>
       </td>
     `;
     tbody.appendChild(tr);
   });
 
-  // Reset select-all checkbox
-  const selAll = $("selectAllItems");
-  if (selAll) selAll.checked = false;
+  // Bind inline save for Admin
+  if (admin) {
+    tbody.querySelectorAll("input[data-field]").forEach(inp => {
+      inp.addEventListener("blur", onInlineFieldBlur);
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.target.blur(); }
+      });
+    });
+  }
 }
+
+/** Save a single field changed inline in the table (Admin only) */
+async function onInlineFieldBlur(e) {
+  const inp = e.target;
+  const code = inp.dataset.code;
+  const field = inp.dataset.field;
+  let value = inp.value;
+
+  const item = currentItems.find(i => i.item_code === code);
+  if (!item) return;
+
+  // Normalize number fields
+  if (["opening","added","issues","cost","price","min_stock"].includes(field)) {
+    value = Number(value);
+    if (isNaN(value) || value < 0) {
+      inp.value = item[field] ?? 0;
+      return;
+    }
+  }
+
+  // No change?
+  if (Number(item[field]) === value) return;
+
+  const oldVal = item[field];
+  item[field] = value; // optimistic
+
+  // Re-render KPIs quickly
+  updateKPIs();
+
+  try {
+    if (!isOnline) {
+      await enqueueMutation({
+        type: "upsert",
+        payload: {
+          p_username: currentUser.username,
+          p_location: activeLocation,
+          p_entry_date: dateKey(),
+          p_item_code: item.item_code,
+          p_description: item.description,
+          p_category: item.category,
+          p_unit: item.unit,
+          p_opening: item.opening,
+          p_added: item.added,
+          p_issues: item.issues,
+          p_cost: item.cost,
+          p_price: item.price,
+          p_comments: item.comments || "",
+          p_min_stock: item.min_stock
+        }
+      });
+      showSaveStatus("Queued offline");
+      // Refresh closing display
+      renderTable();
+      return;
+    }
+
+    const { error } = await db.rpc("secure_upsert_inventory", {
+      p_username: currentUser.username,
+      p_location: activeLocation,
+      p_entry_date: dateKey(),
+      p_item_code: item.item_code,
+      p_description: item.description,
+      p_category: item.category,
+      p_unit: item.unit,
+      p_opening: item.opening,
+      p_added: item.added,
+      p_issues: item.issues,
+      p_cost: item.cost,
+      p_price: item.price,
+      p_comments: item.comments || "",
+      p_min_stock: item.min_stock
+    });
+    if (error) throw error;
+    showSaveStatus("Saved");
+    renderTable(); // refresh closing / low-stock colour
+  } catch (err) {
+    console.error("Inline save failed", err);
+    item[field] = oldVal; // rollback
+    showSaveStatus("Save failed");
+    alert("Could not save change: " + (err.message || err));
+    renderTable();
+  }
+}
+
 
 function updateKPIs() {
   let totalIssues = 0, totalRevenue = 0, lowStock = 0;
@@ -1195,7 +1316,8 @@ function updateKPIs() {
 
     totalIssues += issues;
     totalRevenue += rev;
-    if (closing <= 5) lowStock++;
+    const minLvl = (item.min_stock != null ? Number(item.min_stock) : 5);
+    if (closing <= minLvl) lowStock++;
   });
 
   $("statTotalItems").textContent = currentItems.length;
@@ -1208,21 +1330,36 @@ function openEditItemModal(id) {
   const item = currentItems.find(i => i.id === id);
   if (!item) return;
 
-  const manager = canEditInventory();
+  const manager = canEditInventory(); // Admin only
   $("modalTitle").textContent = manager ? `Edit Item: ${item.description}` : `Log Stock for: ${item.description}`;
   $("itemId").value = item.item_code;
   $("originalItemCode").value = item.item_code;
-  // Managers may edit the global Item ID
+
+  // Only Admin can change the global Item ID
   $("itemId").readOnly = !manager;
   $("itemId").className = manager
     ? "w-full bg-white border border-brand-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-800"
     : "w-full bg-slate-100 border rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-600";
   $("itemIdHint").classList.toggle("hidden", !manager);
+  if (manager) $("itemIdHint").textContent = "Managers can change this ID — it updates in every depot. Duplicates are blocked.";
+
   $("itemDescription").value = item.description;
   $("itemCategory").value = item.category;
   $("itemSpec").value = item.unit;
   $("itemCost").value = item.cost;
   $("itemPrice").value = item.price;
+  $("itemOpening").value = item.opening;
+  $("itemAdded").value = item.added;
+  $("itemIssues").value = item.issues;
+  $("itemComments").value = item.comments || "";
+
+  // Min stock – Admin only
+  if ($("itemMinStock")) {
+    $("itemMinStock").value = (item.min_stock != null ? item.min_stock : 5);
+  }
+  if ($("minStockWrapper")) {
+    $("minStockWrapper").classList.toggle("hidden", !manager);
+  }
 
   if (manager) {
     $("modalLocationWrapper").classList.remove("hidden");
@@ -1230,61 +1367,44 @@ function openEditItemModal(id) {
     $("deleteItemBtn").classList.remove("hidden");
   } else {
     $("modalLocationWrapper").classList.add("hidden");
-    $("itemTargetLocation").value = activeLocation;
     $("deleteItemBtn").classList.add("hidden");
   }
 
-  $("itemDescription").disabled = !manager;
-  $("itemCategory").disabled = !manager;
-  $("itemSpec").disabled = !manager;
-  $("itemOpening").disabled = !manager; 
-  $("itemCost").disabled = !manager;
-  $("itemPrice").disabled = !manager;
-
-  loadStockDataForModalLocation();
+  // Non-admin can still log quantities
+  $("itemOpening").readOnly = false;
+  $("itemAdded").readOnly = false;
+  $("itemIssues").readOnly = false;
 
   $("itemModal").classList.remove("hidden");
-  const _im = $("itemModal"); if (_im) { _im.style.display = "flex"; _im.classList.add("flex"); _im.classList.remove("hidden"); }
+  $("itemModal").classList.add("flex");
 }
 
-async function loadStockDataForModalLocation() {
-  const itemCode = $("itemId").value;
-  const targetLocation = isManager() ? $("itemTargetLocation").value : activeLocation;
-  const date = dateKey();
-
-  const { data } = await db.from('inventory_entries')
-    .select('*')
-    .eq('location', targetLocation)
-    .eq('entry_date', date)
-    .eq('item_code', itemCode)
-    .maybeSingle();
-
-  if (data) {
-    $("itemOpening").value = data.opening || 0;
-    $("itemAdded").value = data.added || 0;
-    $("itemIssues").value = data.issues || 0;
-    $("itemComments").value = data.comments || "";
-  } else {
-    $("itemOpening").value = 0;
-    $("itemAdded").value = 0;
-    $("itemIssues").value = 0;
-    $("itemComments").value = "";
-  }
-}
 
 async function openNewItemModal() {
   if (!canEditInventory()) return;
-  
-  // Fetch next automatic item code
-  const { data, error } = await db.rpc('get_next_item_code');
-  const nextCode = (!error && data) ? data : "001";
+
+  // Fetch next sequential item code from server
+  let nextCode = "001";
+  try {
+    const { data, error } = await db.rpc('get_next_item_code');
+    if (!error && data) nextCode = String(data).padStart(3, "0");
+  } catch (e) {
+    // Fallback: compute max numeric code client-side
+    const nums = currentItems
+      .map(i => parseInt(i.item_code, 10))
+      .filter(n => !isNaN(n));
+    const max = nums.length ? Math.max(...nums) : 0;
+    nextCode = String(max + 1).padStart(3, "0");
+  }
 
   $("modalTitle").textContent = "Add New Master Item (appears in ALL depots)";
   $("itemId").value = nextCode;
   $("originalItemCode").value = ""; // empty = new item
+  // Keep sequential suggestion but allow Admin override
   $("itemId").readOnly = false;
   $("itemId").className = "w-full bg-white border border-brand-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-800";
   $("itemIdHint").classList.remove("hidden");
+  $("itemIdHint").textContent = "Next sequential ID suggested. Change only if needed — duplicates are blocked.";
   $("itemDescription").value = "";
   $("itemCategory").value = "Dry Food Items";
   $("itemSpec").value = "Kg";
@@ -1293,21 +1413,16 @@ async function openNewItemModal() {
   $("itemIssues").value = "0";
   $("itemCost").value = "0.00";
   $("itemPrice").value = "0.00";
+  if ($("itemMinStock")) $("itemMinStock").value = "5";
   $("itemComments").value = "";
-
-  $("modalLocationWrapper").classList.remove("hidden");
-  $("itemTargetLocation").value = activeLocation;
+  $("minStockWrapper") && $("minStockWrapper").classList.remove("hidden");
   $("deleteItemBtn").classList.add("hidden");
+  $("modalLocationWrapper").classList.remove("hidden");
+  if ($("itemTargetLocation")) $("itemTargetLocation").value = activeLocation;
 
-  $("itemDescription").disabled = false;
-  $("itemCategory").disabled = false;
-  $("itemSpec").disabled = false;
-  $("itemOpening").disabled = false;
-  $("itemCost").disabled = false;
-  $("itemPrice").disabled = false;
-
-  const _im = $("itemModal"); if (_im) { _im.style.display = "flex"; _im.classList.add("flex"); _im.classList.remove("hidden"); }
   $("itemModal").classList.remove("hidden");
+  $("itemModal").classList.add("flex");
+  $("itemDescription").focus();
 }
 
 function closeItemModal() {
@@ -1332,6 +1447,20 @@ async function saveItem(e) {
     return;
   }
 
+  // Prevent duplicate Item IDs (client-side guard)
+  const isNewItemCheck = !originalCode;
+  const codeChangedCheck = originalCode && originalCode !== itemCode;
+  if (isNewItemCheck || codeChangedCheck) {
+    const duplicate = currentItems.some(i =>
+      i.item_code === itemCode && i.item_code !== originalCode
+    );
+    if (duplicate) {
+      alert("Item ID \"" + itemCode + "\" already exists. Please use a unique sequential ID.");
+      $("itemId").focus();
+      return;
+    }
+  }
+
   // Global master fields – these must be identical in every depot
   const globalFields = {
     p_item_code: itemCode,
@@ -1346,7 +1475,8 @@ async function saveItem(e) {
     ...globalFields,
     p_cost: Number($("itemCost").value) || 0,
     p_price: Number($("itemPrice").value) || 0,
-    p_comments: $("itemComments").value.trim()
+    p_comments: $("itemComments").value.trim(),
+    p_min_stock: (isAdmin() && $("itemMinStock")) ? (Number($("itemMinStock").value) || 5) : undefined
   };
 
   // Quantities are location-specific
