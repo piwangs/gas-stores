@@ -372,8 +372,9 @@
 <script>
 "use strict";
 
-const SUPABASE_URL = "https://pxboxopyrcprdmpjucia.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4Ym94b3B5cmNwcmRtcGp1Y2lhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3MzYyNDEsImV4cCI6MjEwODMxMjI0MX0.rw8NCKG1JMPDbQyiIpjRYVSpNHaXn6R_hp_aJSocGpc";
+// ✅ Pointed at the project that holds your real data
+const SUPABASE_URL = "https://chfpcwlpmzcyorifzpja.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNoZnBjd2xwbXpjeW9yaWZ6cGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwMjE5MzEsImV4cCI6MjEwOTU5NzkzMX0.73G3XXghDxrwVxbDibXemM5LB57LHUZdw4nK_Nc4lLo";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
@@ -605,9 +606,7 @@ async function handleLogin(e) {
   errorEl.classList.add("hidden"); errorEl.textContent = "";
 
   const LOCAL_USERS = [
-    { id: 1, username: "admin", password: "admin2026", name: "System Administrator", role: "Admin", location: "Tongping" },
-    { id: 3, username: "store_tongping", password: "juba2026", name: "Tongping Storekeeper", role: "Storekeeper", location: "Tongping" },
-    { id: 55, username: "Enid", password: "admin2026", name: "Enid", role: "Manager", location: "Tongping" }
+    { id: 1, username: "admin", password: "admin2026", name: "System Administrator", role: "Admin", location: "Tongping" }
   ];
   let row = LOCAL_USERS.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password) || null;
 
@@ -638,6 +637,7 @@ async function handleLogin(e) {
   const show = (id, on) => { const el = $(id); if (!el) return; el.classList.toggle("hidden", !on); if ("disabled" in el) el.disabled = !on; };
 
   console.log("[GAS] Logged in as:", currentUser.username, "| role:", currentUser.role, "| isAdmin:", admin, "| canApprove:", mgr);
+  console.log("[GAS] Using Supabase project:", SUPABASE_URL);
 
   show("managerLocationBox", false);
   show("transferBtn", false);
@@ -660,7 +660,7 @@ async function handleLogin(e) {
 async function loadLocations() {
   const { data } = await db.from('locations').select('name').order('name');
   if (data && data.length) {
-    allLocationsList = ["Tongping"];
+    allLocationsList = data.map(l => l.name);
     ["locationSelector", "itemTargetLocation", "transferFromLoc", "transferToLoc", "newUserLocation", "editUserLocation"].forEach(id => {
       const select = $(id);
       if (select) {
@@ -1620,7 +1620,6 @@ async function saveUserEdits(e) {
 
   if (newPassword && newPassword.length < 8) { alert("Password 8+ chars"); return; }
 
-  // CRITICAL: always send a string ('' not undefined) so PostgREST matches the 6-param signature
   const passwordToSend = newPassword ? newPassword : "";
 
   const { error } = await db.rpc('update_store_user', {
