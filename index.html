@@ -1184,22 +1184,31 @@ function openEditItemModal(id) {
   $("itemModal").classList.add("flex");
 }
 
-async function openNewItemModal() {
+function localNextItemCode() {
+  const nums = (currentItems || [])
+    .map(i => parseInt(String(i.item_code), 10))
+    .filter(n => !isNaN(n));
+  const max = nums.length ? Math.max(...nums) : 0;
+  return String(max + 1).padStart(3, "0");
+}
+
+function openNewItemModal() {
   if (!canEditInventory()) return;
-  let nextCode = "001";
-  try {
-    const { data, error } = await db.rpc('get_next_item_code');
-    if (!error && data) nextCode = String(data).padStart(3, "0");
-  } catch (e) {
-    const nums = currentItems.map(i => parseInt(i.item_code, 10)).filter(n => !isNaN(n));
-    nextCode = String((nums.length ? Math.max(...nums) : 0) + 1).padStart(3, "0");
-  }
-  $("modalTitle").textContent = "Add New Item (all depots)";
+
+  // Instant sequential suggestion from local data (no network wait)
+  const nextCode = localNextItemCode();
+
+  $("modalTitle").textContent = isOnline
+    ? "Add New Item"
+    : "Add New Item (offline – will sync later)";
   $("itemId").value = nextCode;
   $("originalItemCode").value = "";
   $("itemId").readOnly = false;
   $("itemId").className = "w-full bg-white border border-brand-300 rounded-lg px-3 py-2 text-xs font-mono font-bold text-slate-800";
   $("itemIdHint").classList.remove("hidden");
+  $("itemIdHint").textContent = isOnline
+    ? "Next sequential ID suggested. Duplicates are blocked."
+    : "Offline mode: ID is local. Will sync when you are back online.";
   $("itemDescription").value = "";
   $("itemCategory").value = "Dry Food Items";
   $("itemSpec").value = "Kg";
@@ -1212,11 +1221,25 @@ async function openNewItemModal() {
   $("itemComments").value = "";
   $("minStockWrapper")?.classList.remove("hidden");
   $("deleteItemBtn").classList.add("hidden");
-  $("modalLocationWrapper").classList.remove("hidden");
+  $("modalLocationWrapper")?.classList.remove("hidden");
   if ($("itemTargetLocation")) $("itemTargetLocation").value = activeLocation;
+
+  // Open immediately
   $("itemModal").classList.remove("hidden");
   $("itemModal").classList.add("flex");
   $("itemDescription").focus();
+
+  // Optional: refresh ID from server in background (does not block UI)
+  if (isOnline) {
+    db.rpc("get_next_item_code").then(({ data, error }) => {
+      if (error || data == null) return;
+      // Only update if user has not typed a custom ID yet
+      const current = ($("itemId").value || "").trim();
+      if (current === nextCode) {
+        $("itemId").value = String(data).padStart(3, "0");
+      }
+    }).catch(() => {});
+  }
 }
 
 function closeItemModal() {
@@ -1313,9 +1336,39 @@ async function saveItem(e) {
       });
       if (error) throw error;
     }
+    // Optimistic local update so UI feels instant
+    const existingIdx = currentItems.findIndex(i => i.item_code === itemCode || (originalCode && i.item_code === originalCode));
+    const localItem = {
+      id: existingIdx >= 0 ? currentItems[existingIdx].id : Date.now(),
+      item_code: itemCode,
+      description: globalFields.p_description,
+      category: globalFields.p_category,
+      unit: globalFields.p_unit,
+      opening, added, issues,
+      cost: basePayload.p_cost,
+      price: basePayload.p_price,
+      comments: basePayload.p_comments,
+      min_stock: minStockVal
+    };
+    if (existingIdx >= 0) {
+      // If code renamed, remove old code row first
+      if (originalCode && originalCode !== itemCode) {
+        currentItems = currentItems.filter(i => i.item_code !== originalCode);
+        currentItems.push(localItem);
+      } else {
+        currentItems[existingIdx] = localItem;
+      }
+    } else {
+      currentItems.push(localItem);
+    }
+    currentItems.sort(numericItemSort);
+    await cacheInventory(activeLocation, dateKey(), currentItems);
     closeItemModal();
-    await loadCloudData();
-    showSaveStatus("Saved & synced");
+    renderTable();
+    updateKPIs();
+    showSaveStatus(isNewItem ? "New item saved" : "Saved & synced");
+    // Refresh from cloud in background (non-blocking)
+    loadCloudData().catch(() => {});
   } catch (err) {
     const msg = (err && err.message) ? err.message : String(err);
     console.error("Save error:", err);
