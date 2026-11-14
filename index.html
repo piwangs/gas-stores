@@ -793,11 +793,16 @@ async function loadCloudData() {
       if (!dailyEntries || dailyEntries.length === 0) {
         showSaveStatus("Carrying forward yesterday…", true);
         const result = await carryForwardFromPreviousDay(date);
-        showSaveStatus(
-          result.ok
-            ? `Carried forward ${result.ok} item(s)` + (result.failed.length ? ` (${result.failed.length} failed)` : "")
-            : "No previous-day data"
-        );
+        if (result.ok) {
+          showSaveStatus(`Carried forward ${result.ok} item(s)` + (result.failed.length ? ` (${result.failed.length} failed)` : ""));
+        } else if (result.failed && result.failed.length) {
+          showSaveStatus(`Carry failed 0/${result.failed.length}`);
+          console.error("Carry-forward first error:", result.firstError);
+          alert("Carry-forward failed for all items.\n\nFirst error:\n" + (result.firstError || "unknown") +
+            "\n\nMost common cause: database function signature mismatch. Deploy the latest HTML fix (no p_min_stock).");
+        } else {
+          showSaveStatus("No previous-day data");
+        }
         const ref = await db.from('inventory_entries')
           .select('*')
           .eq('location', activeLocation)
@@ -891,12 +896,15 @@ async function manualCarryForward() {
     const result = await carryForwardFromPreviousDay(date, missing);
     await loadCloudData();
 
-    alert(
-      `✅ Carry Forward complete.\n\n` +
+    let msg =
+      `Carry Forward complete.\n\n` +
       `Added: ${result.ok}\n` +
-      `Failed: ${result.failed.length}` +
-      (result.failed.length ? `\nCodes: ${result.failed.slice(0, 10).join(", ")}` : "")
-    );
+      `Failed: ${result.failed.length}`;
+    if (result.failed.length) {
+      msg += `\nCodes: ${result.failed.slice(0, 10).join(", ")}`;
+      if (result.firstError) msg += `\n\nFirst error:\n${result.firstError}`;
+    }
+    alert(msg);
   } catch (err) {
     console.error(err);
     alert("Carry Forward failed: " + (err.message || err));
@@ -914,26 +922,29 @@ async function carryForwardFromPreviousDay(targetDate, onlyMissingCodes = null) 
     .eq('entry_date', prevDateStr);
   if (error) throw error;
   if (!prevData || prevData.length === 0) {
-    return { ok: 0, failed: [] };
+    console.warn("No previous-day rows for", prevDateStr);
+    return { ok: 0, failed: [], firstError: null };
   }
 
   if (onlyMissingCodes && onlyMissingCodes.length) {
     const set = new Set(onlyMissingCodes);
     prevData = prevData.filter(p => set.has(p.item_code));
   }
-  if (prevData.length === 0) return { ok: 0, failed: [] };
+  if (prevData.length === 0) return { ok: 0, failed: [], firstError: null };
 
-  showSaveStatus(`Carrying forward ${prevData.length} item(s)…`, true);
+  showSaveStatus(`Carrying forward 0/${prevData.length}…`, true);
 
   let ok = 0;
   const failed = [];
-  const BATCH = 15;
+  let firstError = null;
+  const BATCH = 10;
 
   for (let i = 0; i < prevData.length; i += BATCH) {
     const batch = prevData.slice(i, i + BATCH);
     await Promise.all(batch.map(async (p) => {
       const opening = Number(p.opening) + Number(p.added) - Number(p.issues);
       try {
+        // NOTE: do NOT send p_min_stock — live PostgREST schema does not expose it yet
         const { error } = await db.rpc('secure_upsert_inventory', {
           p_username: currentUser.username,
           p_location: activeLocation,
@@ -945,22 +956,26 @@ async function carryForwardFromPreviousDay(targetDate, onlyMissingCodes = null) 
           p_opening: opening,
           p_added: 0,
           p_issues: 0,
-          p_cost: p.cost,
-          p_price: p.price,
-          p_comments: "",
-          p_min_stock: Number(p.min_stock ?? 5)
+          p_cost: Number(p.cost) || 0,
+          p_price: Number(p.price) || 0,
+          p_comments: ""
         });
         if (error) throw error;
         ok++;
       } catch (err) {
+        if (!firstError) firstError = (err && (err.message || err.details || String(err))) || "unknown error";
         console.warn("Carry-forward failed for", p.item_code, err);
         failed.push(p.item_code);
       }
     }));
-    showSaveStatus(`Carried ${ok}/${prevData.length}…`);
+    showSaveStatus(`Carrying forward ${ok}/${prevData.length}…`);
   }
 
-  return { ok, failed };
+  if (failed.length && firstError) {
+    console.error("First carry-forward error:", firstError);
+  }
+
+  return { ok, failed, firstError };
 }
 
 async function healTodayInventory() {
@@ -1081,7 +1096,7 @@ async function onInlineFieldBlur(e) {
   item[field] = value;
   updateKPIs();
 
-  // Build payload with ALL 14 params — always numeric for p_min_stock
+  // Build upsert payload (13 params — live schema has no p_min_stock yet)
   const payload = {
     p_username: currentUser.username,
     p_location: activeLocation,
@@ -1095,8 +1110,7 @@ async function onInlineFieldBlur(e) {
     p_issues:  Number(item.issues)  || 0,
     p_cost:    Number(item.cost)    || 0,
     p_price:   Number(item.price)   || 0,
-    p_comments: item.comments || "",
-    p_min_stock: Number(item.min_stock ?? 5)
+    p_comments: item.comments || ""
   };
 
   try {
@@ -1232,7 +1246,7 @@ async function saveItem(e) {
     p_unit: $("itemSpec").value.trim()
   };
 
-  // Always numeric p_min_stock
+  // min_stock UI is local-only until DB exposes p_min_stock
   const minStockVal = isAdmin() && $("itemMinStock")
     ? (Number($("itemMinStock").value) || 5)
     : 5;
@@ -1243,8 +1257,7 @@ async function saveItem(e) {
     ...globalFields,
     p_cost: Number($("itemCost").value) || 0,
     p_price: Number($("itemPrice").value) || 0,
-    p_comments: $("itemComments").value.trim(),
-    p_min_stock: minStockVal
+    p_comments: $("itemComments").value.trim()
   };
 
   const opening = Number($("itemOpening").value) || 0;
@@ -1399,7 +1412,7 @@ async function ensureItemInAllDepots({
       p_opening: (loc === primaryLocation) ? (opening || 0) : 0,
       p_added: (loc === primaryLocation) ? (added || 0) : 0,
       p_issues: (loc === primaryLocation) ? (issues || 0) : 0,
-      p_cost: cost || 0, p_price: price || 0, p_comments: comments || "", p_min_stock: 5
+      p_cost: cost || 0, p_price: price || 0, p_comments: comments || ""
     });
     if (error) errors.push(loc + ": " + error.message);
     else written++;
@@ -2009,7 +2022,7 @@ async function handleExcelUpload(e) {
           const { error } = await db.rpc("secure_upsert_inventory", {
             p_username: currentUser.username, p_location: activeLocation, p_entry_date: dateKey(),
             p_item_code: itemCode, p_description: description, p_category: category, p_unit: unit,
-            p_opening: opening, p_added: 0, p_issues: 0, p_cost: cost, p_price: price, p_comments: "Updated from Excel", p_min_stock: 5
+            p_opening: opening, p_added: 0, p_issues: 0, p_cost: cost, p_price: price, p_comments: "Updated from Excel"
           });
           if (error) throw error;
         }
@@ -2081,7 +2094,7 @@ async function handleInventoryRestore(e) {
           p_username: currentUser.username, p_location: location, p_entry_date: entryDate,
           p_item_code: itemCode, p_description: description, p_category: category, p_unit: unit,
           p_opening: opening, p_added: added, p_issues: issues,
-          p_cost: cost, p_price: price, p_comments: comments, p_min_stock: 5
+          p_cost: cost, p_price: price, p_comments: comments
         });
         if (error) throw error;
         ok++;
@@ -2113,7 +2126,7 @@ async function resetAllStock() {
         const { error: upErr } = await db.rpc("secure_upsert_inventory", {
           p_username: currentUser.username, p_location: row.location, p_entry_date: dateKey(),
           p_item_code: row.item_code, p_description: row.description, p_category: row.category, p_unit: row.unit,
-          p_opening: 0, p_added: 0, p_issues: 0, p_cost: row.cost, p_price: row.price, p_comments: "", p_min_stock: 5
+          p_opening: 0, p_added: 0, p_issues: 0, p_cost: row.cost, p_price: row.price, p_comments: ""
         });
         if (upErr) throw upErr;
         ok++;
