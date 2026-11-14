@@ -474,7 +474,6 @@ async function checkConnectivity() {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
-    // Use a real GET (HEAD /rest/v1/ often returns 401 and only noisies the console)
     const res = await fetch(`${SUPABASE_URL}/rest/v1/locations?select=name&limit=1`, {
       method: "GET",
       headers: {
@@ -486,7 +485,6 @@ async function checkConnectivity() {
       cache: "no-store"
     });
     clearTimeout(timeout);
-    // Any HTTP response means the API is reachable
     const online = res.status > 0 && res.status < 500;
     if (online !== isOnline) {
       isOnline = online;
@@ -626,7 +624,7 @@ window.addEventListener("DOMContentLoaded", () => {
 function bindEvents() {
   $("loginForm").addEventListener("submit", handleLogin);
   $("logoutBtn").addEventListener("click", () => location.reload());
-  // INLINE_DELEGATE_BOUND — single delegated handler (survives re-renders)
+
   const tableBodyEl = $("tableBody");
   if (tableBodyEl && !tableBodyEl.dataset.inlineBound) {
     tableBodyEl.dataset.inlineBound = "1";
@@ -761,7 +759,18 @@ async function handleLogin(e) {
 
   const admin = isAdmin();
   const mgr = canApprove();
-  const show = (id, on) => { const el = $(id); if (el) el.classList.toggle("hidden", !on); };
+  const show = (id, on) => {
+    const el = $(id);
+    if (!el) return;
+    el.classList.toggle("hidden", !on);
+    if ("disabled" in el) el.disabled = !on;
+  };
+
+  console.log("[GAS] Logged in as:", currentUser.username,
+              "| role:", currentUser.role,
+              "| isAdmin:", admin,
+              "| canApprove:", mgr);
+
   show("managerLocationBox", false);
   show("transferBtn", false);
   show("newItemBtn", admin);
@@ -816,8 +825,6 @@ async function loadCloudData() {
         .eq('entry_date', date);
       if (error) throw error;
 
-      // Auto carry-forward only when the day is completely empty
-      // Uses secure_upsert_inventory only (no carry_forward_day RPC)
       if (!dailyEntries || dailyEntries.length === 0) {
         showSaveStatus("Carrying forward yesterday…", true);
         const result = await carryForwardFromPreviousDay(date);
@@ -826,8 +833,6 @@ async function loadCloudData() {
         } else if (result.failed && result.failed.length) {
           showSaveStatus(`Carry failed 0/${result.failed.length}`);
           console.error("Carry-forward first error:", result.firstError);
-          alert("Carry-forward failed for all items.\n\nFirst error:\n" + (result.firstError || "unknown") +
-            "\n\nMost common cause: database function signature mismatch. Deploy the latest HTML fix (no p_min_stock).");
         } else {
           showSaveStatus("No previous-day data");
         }
@@ -860,7 +865,6 @@ async function loadCloudData() {
       updateConnectionBadge();
       const cached = await loadCachedInventory(activeLocation, date);
       currentItems = (cached || []).sort(numericItemSort);
-      if (err.message) alert("Load issue: " + err.message);
     }
   } else {
     const cached = await loadCachedInventory(activeLocation, date);
@@ -897,7 +901,6 @@ async function manualCarryForward() {
 
   showSaveStatus("Carrying forward…", true);
   try {
-    // Prefer heal-style: only missing codes
     const { data: prevData } = await db.from('inventory_entries')
       .select('item_code')
       .eq('location', activeLocation)
@@ -972,7 +975,6 @@ async function carryForwardFromPreviousDay(targetDate, onlyMissingCodes = null) 
     await Promise.all(batch.map(async (p) => {
       const opening = Number(p.opening) + Number(p.added) - Number(p.issues);
       try {
-        // NOTE: do NOT send p_min_stock — live PostgREST schema does not expose it yet
         const { error } = await db.rpc('secure_upsert_inventory', {
           p_username: currentUser.username,
           p_location: activeLocation,
@@ -1096,9 +1098,7 @@ function renderTable() {
     `;
     tbody.appendChild(tr);
   });
-
 }
-
 
 async function onInlineFieldBlur(e) {
   const inp = e.target;
@@ -1112,7 +1112,6 @@ async function onInlineFieldBlur(e) {
   const item = currentItems.find(i => i.item_code === code);
   if (!item) return;
 
-  // Normalize numbers
   if (["opening", "added", "issues", "cost", "price", "min_stock"].includes(field)) {
     value = Number(value);
     if (isNaN(value) || value < 0) {
@@ -1121,7 +1120,6 @@ async function onInlineFieldBlur(e) {
     }
   }
 
-  // No real change
   if (Number(item[field]) === Number(value)) return;
 
   const oldVal = item[field];
@@ -1129,15 +1127,12 @@ async function onInlineFieldBlur(e) {
   inp.dataset.saving = "1";
   inp.classList.add("opacity-60");
 
-  // Update closing cell in-place (no full re-render)
   try {
     const tr = inp.closest("tr");
     if (tr) {
       const closing = Number(item.opening) + Number(item.added) - Number(item.issues);
       const minLvl = Number(item.min_stock) || 5;
-      // Closing column is the first non-input numeric highlight td after issues
       const tds = tr.querySelectorAll("td");
-      // columns: check, id, desc, cat, unit, opening, added, issues, closing, min, cost, price, rev, comments, actions
       if (tds.length >= 9) {
         const closingTd = tds[8];
         if (closingTd && !closingTd.querySelector("input")) {
@@ -1185,7 +1180,6 @@ async function onInlineFieldBlur(e) {
     showSaveStatus("Saved");
     inp.dataset.saving = "0";
     inp.classList.remove("opacity-60");
-    // Do NOT full renderTable() — keeps focus/values stable
   } catch (err) {
     console.error("Inline save failed", err);
     item[field] = oldVal;
@@ -1195,20 +1189,16 @@ async function onInlineFieldBlur(e) {
     inp.classList.remove("opacity-60");
 
     const msg = (err && err.message) ? err.message : String(err);
-    // Network fallback → queue offline
     if (/failed to fetch|networkerror|load failed|Failed to fetch/i.test(msg)) {
       isOnline = false;
       updateConnectionBadge();
       item[field] = value;
       inp.value = value;
-      await enqueueMutation({ type: "upsert", payload: { ...payload, ["p_" + (field === "min_stock" ? "opening" : field)]: field === "min_stock" ? payload.p_opening : value } });
-      // simpler: just queue the full current payload with reverted fix
       payload["p_opening"] = Number(item.opening) || 0;
       payload["p_added"] = Number(item.added) || 0;
       payload["p_issues"] = Number(item.issues) || 0;
       payload["p_cost"] = Number(item.cost) || 0;
       payload["p_price"] = Number(item.price) || 0;
-      item[field] = value;
       await enqueueMutation({ type: "upsert", payload });
       await cacheInventory(activeLocation, dateKey(), currentItems);
       showSaveStatus("Saved offline");
@@ -1217,7 +1207,6 @@ async function onInlineFieldBlur(e) {
     alert("Could not save change: " + msg);
   }
 }
-
 
 function updateKPIs() {
   let ti = 0, tr = 0, ls = 0;
@@ -1279,14 +1268,21 @@ function localNextItemCode() {
 }
 
 function openNewItemModal() {
-  if (!canEditInventory()) return;
+  if (!currentUser) {
+    alert("Please log in first.");
+    return;
+  }
+  if (!canEditInventory()) {
+    alert("Only Administrators can add new items.");
+    return;
+  }
 
-  // Instant sequential suggestion from local data (no network wait)
   const nextCode = localNextItemCode();
 
   $("modalTitle").textContent = isOnline
-    ? "Add New Item"
+    ? "Add New Item (applies to all depots)"
     : "Add New Item (offline – will sync later)";
+
   $("itemId").value = nextCode;
   $("originalItemCode").value = "";
   $("itemId").readOnly = false;
@@ -1295,6 +1291,7 @@ function openNewItemModal() {
   $("itemIdHint").textContent = isOnline
     ? "Next sequential ID suggested. Duplicates are blocked."
     : "Offline mode: ID is local. Will sync when you are back online.";
+
   $("itemDescription").value = "";
   $("itemCategory").value = "Dry Food Items";
   $("itemSpec").value = "Kg";
@@ -1305,21 +1302,19 @@ function openNewItemModal() {
   $("itemPrice").value = "0.00";
   if ($("itemMinStock")) $("itemMinStock").value = "5";
   $("itemComments").value = "";
+
   $("minStockWrapper")?.classList.remove("hidden");
-  $("deleteItemBtn").classList.add("hidden");
+  $("deleteItemBtn")?.classList.add("hidden");
   $("modalLocationWrapper")?.classList.remove("hidden");
   if ($("itemTargetLocation")) $("itemTargetLocation").value = activeLocation;
 
-  // Open immediately
   $("itemModal").classList.remove("hidden");
   $("itemModal").classList.add("flex");
   $("itemDescription").focus();
 
-  // Optional: refresh ID from server in background (does not block UI)
   if (isOnline) {
     db.rpc("get_next_item_code").then(({ data, error }) => {
       if (error || data == null) return;
-      // Only update if user has not typed a custom ID yet
       const current = ($("itemId").value || "").trim();
       if (current === nextCode) {
         $("itemId").value = String(data).padStart(3, "0");
@@ -1355,7 +1350,6 @@ async function saveItem(e) {
     p_unit: $("itemSpec").value.trim()
   };
 
-  // min_stock UI is local-only until DB exposes p_min_stock
   const minStockVal = isAdmin() && $("itemMinStock")
     ? (Number($("itemMinStock").value) || 5)
     : 5;
@@ -1422,7 +1416,6 @@ async function saveItem(e) {
       });
       if (error) throw error;
     }
-    // Optimistic local update so UI feels instant
     const existingIdx = currentItems.findIndex(i => i.item_code === itemCode || (originalCode && i.item_code === originalCode));
     const localItem = {
       id: existingIdx >= 0 ? currentItems[existingIdx].id : Date.now(),
@@ -1437,7 +1430,6 @@ async function saveItem(e) {
       min_stock: minStockVal
     };
     if (existingIdx >= 0) {
-      // If code renamed, remove old code row first
       if (originalCode && originalCode !== itemCode) {
         currentItems = currentItems.filter(i => i.item_code !== originalCode);
         currentItems.push(localItem);
@@ -1453,7 +1445,6 @@ async function saveItem(e) {
     renderTable();
     updateKPIs();
     showSaveStatus(isNewItem ? "New item saved" : "Saved & synced");
-    // Refresh from cloud in background (non-blocking)
     loadCloudData().catch(() => {});
   } catch (err) {
     const msg = (err && err.message) ? err.message : String(err);
