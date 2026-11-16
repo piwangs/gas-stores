@@ -674,7 +674,9 @@ async function handleLogin(e) {
   try { await loadCloudData(); } catch (e) { console.warn(e); }
 }
 
-/* ---------- INVENTORY LOAD ---------- */
+/* ============================================================
+   LOAD INVENTORY — with VISIBLE auto-carry failures
+   ============================================================ */
 async function loadCloudData() {
   if (!currentUser) return;
   const date = dateKey();
@@ -688,9 +690,20 @@ async function loadCloudData() {
       if (!dailyEntries || dailyEntries.length === 0) {
         showSaveStatus("Carrying forward yesterday…", true);
         const result = await carryForwardFromPreviousDay(date);
-        if (result.ok) showSaveStatus(`Carried forward ${result.ok} item(s)` + (result.failed.length ? ` (${result.failed.length} failed)` : ""));
-        else if (result.failed && result.failed.length) { showSaveStatus(`Carry failed 0/${result.failed.length}`); console.error("Carry-forward first error:", result.firstError); }
-        else showSaveStatus("No previous-day data");
+        if (result.ok > 0) {
+          showSaveStatus(`Carried forward ${result.ok} item(s)` + (result.failed.length ? ` (${result.failed.length} failed)` : ""));
+        } else if (result.failed.length > 0) {
+          // VISIBLE failure — this used to be silent
+          alert(
+            `⚠️ Auto carry-forward failed for ${result.failed.length} item(s).\n\n` +
+            `First error:\n${result.firstError || "unknown"}\n\n` +
+            `Try the manual "Carry Forward" button, or run this in Supabase SQL Editor:\n\n` +
+            `SELECT public.carry_forward_day('${currentUser.username}', '${DEPOT}', DATE '${date}');`
+          );
+          showSaveStatus("Carry-forward failed — see alert");
+        } else {
+          showSaveStatus("No previous-day data to carry forward");
+        }
 
         const ref = await db.from('inventory_entries').select('*').eq('location', DEPOT).eq('entry_date', date);
         dailyEntries = ref.data || [];
@@ -711,6 +724,7 @@ async function loadCloudData() {
       isOnline = false; updateConnectionBadge();
       const cached = await loadCachedInventory(DEPOT, date);
       currentItems = (cached || []).sort(numericItemSort);
+      if (err && err.message) alert("Load issue: " + err.message);
     }
   } else {
     const cached = await loadCachedInventory(DEPOT, date);
@@ -720,7 +734,75 @@ async function loadCloudData() {
   renderTable(); updateKPIs();
 }
 
-/* ---------- CARRY FORWARD ---------- */
+/* ============================================================
+   CARRY FORWARD — prefers atomic RPC, falls back to per-item
+   ============================================================ */
+async function carryForwardFromPreviousDay(targetDate, onlyMissingCodes = null) {
+  // If no explicit "only these codes" filter is passed, use the atomic RPC.
+  // The RPC is faster (single SQL loop) and deterministic — it either
+  // copies all items or fails as one unit.
+  if (!onlyMissingCodes || onlyMissingCodes.length === 0) {
+    try {
+      const { data, error } = await db.rpc('carry_forward_day', {
+        p_username: currentUser.username,
+        p_location: DEPOT,
+        p_to_date: targetDate
+      });
+      if (error) throw error;
+      console.log(`[GAS] carry_forward_day → ${data} row(s) inserted for ${targetDate}`);
+      return { ok: Number(data) || 0, failed: [], firstError: null };
+    } catch (err) {
+      const msg = (err && (err.message || err.details || String(err))) || "unknown error";
+      console.warn("[GAS] carry_forward_day RPC failed, falling back to per-item upserts:", msg);
+      // Fall through to per-item loop below
+    }
+  }
+
+  // Per-item fallback (also used when onlyMissingCodes is provided)
+  const prevDate = new Date(targetDate + "T12:00:00");
+  prevDate.setDate(prevDate.getDate() - 1);
+  const prevDateStr = localDateString(prevDate);
+
+  let { data: prevData, error } = await db.from('inventory_entries').select('*')
+    .eq('location', DEPOT).eq('entry_date', prevDateStr);
+  if (error) throw error;
+  if (!prevData || prevData.length === 0) return { ok: 0, failed: [], firstError: null };
+
+  if (onlyMissingCodes && onlyMissingCodes.length) {
+    const set = new Set(onlyMissingCodes);
+    prevData = prevData.filter(p => set.has(p.item_code));
+  }
+  if (prevData.length === 0) return { ok: 0, failed: [], firstError: null };
+
+  showSaveStatus(`Carrying forward 0/${prevData.length}…`, true);
+  let ok = 0; const failed = []; let firstError = null;
+  const BATCH = 10;
+
+  for (let i = 0; i < prevData.length; i += BATCH) {
+    const batch = prevData.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (p) => {
+      const opening = Number(p.opening) + Number(p.added) - Number(p.issues);
+      try {
+        const { error } = await db.rpc('secure_upsert_inventory', {
+          p_username: currentUser.username, p_location: DEPOT, p_entry_date: targetDate,
+          p_item_code: p.item_code, p_description: p.description, p_category: p.category, p_unit: p.unit,
+          p_opening: opening, p_added: 0, p_issues: 0,
+          p_cost: Number(p.cost) || 0, p_price: Number(p.price) || 0, p_comments: "",
+          p_min_stock: Number(p.min_stock ?? 5)
+        });
+        if (error) throw error; ok++;
+      } catch (err) {
+        if (!firstError) firstError = (err && (err.message || err.details || String(err))) || "unknown error";
+        failed.push(p.item_code);
+      }
+    }));
+    showSaveStatus(`Carrying forward ${ok}/${prevData.length}…`);
+  }
+
+  return { ok, failed, firstError };
+}
+
+/* ---------- MANUAL CARRY FORWARD ---------- */
 async function manualCarryForward() {
   if (!currentUser || !isOnline) { alert("You must be online and logged in."); return; }
   if (!isAdmin() && !isManager()) { alert("Only Managers / Admins can run Carry Forward."); return; }
@@ -740,46 +822,6 @@ async function manualCarryForward() {
     if (result.failed.length) { msg += `\nCodes: ${result.failed.slice(0, 10).join(", ")}`; if (result.firstError) msg += `\n\nFirst error:\n${result.firstError}`; }
     alert(msg);
   } catch (err) { console.error(err); alert("Carry Forward failed: " + (err.message || err)); }
-}
-
-async function carryForwardFromPreviousDay(targetDate, onlyMissingCodes = null) {
-  const prevDate = new Date(targetDate + "T12:00:00");
-  prevDate.setDate(prevDate.getDate() - 1);
-  const prevDateStr = localDateString(prevDate);
-  let { data: prevData, error } = await db.from('inventory_entries').select('*').eq('location', DEPOT).eq('entry_date', prevDateStr);
-  if (error) throw error;
-  if (!prevData || prevData.length === 0) return { ok: 0, failed: [], firstError: null };
-  if (onlyMissingCodes && onlyMissingCodes.length) {
-    const set = new Set(onlyMissingCodes);
-    prevData = prevData.filter(p => set.has(p.item_code));
-  }
-  if (prevData.length === 0) return { ok: 0, failed: [], firstError: null };
-  showSaveStatus(`Carrying forward 0/${prevData.length}…`, true);
-  let ok = 0; const failed = []; let firstError = null;
-  const BATCH = 10;
-  for (let i = 0; i < prevData.length; i += BATCH) {
-    const batch = prevData.slice(i, i + BATCH);
-    await Promise.all(batch.map(async (p) => {
-      const opening = Number(p.opening) + Number(p.added) - Number(p.issues);
-      try {
-        const { error } = await db.rpc('secure_upsert_inventory', {
-          p_username: currentUser.username, p_location: DEPOT, p_entry_date: targetDate,
-          p_item_code: p.item_code, p_description: p.description, p_category: p.category, p_unit: p.unit,
-          p_opening: opening, p_added: 0, p_issues: 0,
-          p_cost: Number(p.cost) || 0, p_price: Number(p.price) || 0, p_comments: "",
-          p_min_stock: Number(p.min_stock ?? 5)
-        });
-        if (error) throw error; ok++;
-      } catch (err) {
-        if (!firstError) firstError = (err && (err.message || err.details || String(err))) || "unknown error";
-        console.warn("Carry-forward failed for", p.item_code, err);
-        failed.push(p.item_code);
-      }
-    }));
-    showSaveStatus(`Carrying forward ${ok}/${prevData.length}…`);
-  }
-  if (failed.length && firstError) console.error("First carry-forward error:", firstError);
-  return { ok, failed, firstError };
 }
 
 async function healTodayInventory() {
